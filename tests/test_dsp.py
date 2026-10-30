@@ -1,0 +1,122 @@
+"""Unit tests - standard library only, no ffmpeg required."""
+import math
+import unittest
+from array import array
+
+from automix import dsp, render, taxonomy
+
+SR = 11025
+HOP = dsp.HOP
+FRAME = dsp.FRAME
+
+
+def _silence(seconds, sr=SR):
+    return array("h", [0]) * int(seconds * sr)
+
+
+def _tone(seconds, freq=440.0, amp=10000, sr=SR):
+    n = int(seconds * sr)
+    return array("h", [int(amp * math.sin(2 * math.pi * freq * i / sr)) for i in range(n)])
+
+
+def _click_train(bpm, seconds, amp=30000, click_ms=8, sr=SR):
+    period = 60.0 / bpm
+    click = int(sr * click_ms / 1000)
+    n = int(seconds * sr)
+    a = array("h", [0]) * n
+    k = 0
+    while True:
+        start = int(k * period * sr)
+        if start >= n:
+            break
+        for i in range(start, min(n, start + click)):
+            a[i] = amp
+        k += 1
+    return a
+
+
+class TestTempo(unittest.TestCase):
+    def test_click_train_is_rhythmic(self):
+        # A pure click train is tempo-ambiguous (every divisor is also a valid
+        # period), so we assert a plausible tempo and a strong rhythm reading -
+        # the property the classifier actually relies on.
+        env = dsp.frame_rms(_click_train(120, 20))
+        bpm, strength = dsp.estimate_tempo(env, SR)
+        self.assertIsNotNone(bpm)
+        self.assertTrue(55 <= bpm <= 130, bpm)
+        self.assertGreater(strength, 2.0)
+
+    def test_flat_envelope_has_no_tempo(self):
+        bpm, strength = dsp.estimate_tempo([1.0] * 400, SR)
+        self.assertIsNone(bpm)
+        self.assertEqual(strength, 0.0)
+
+
+class TestEnvelopeFeatures(unittest.TestCase):
+    def test_zero_crossing_rate(self):
+        alternating = array("h", [1000 if i % 2 else -1000 for i in range(1000)])
+        self.assertGreater(dsp.zero_crossing_rate(alternating), 0.9)
+        constant = array("h", [1000]) * 1000
+        self.assertEqual(dsp.zero_crossing_rate(constant), 0.0)
+
+    def test_silence_edges(self):
+        samples = _silence(2) + _tone(3) + _silence(3)
+        env = dsp.frame_rms(samples)
+        lead, trail = dsp.silence_edges(env, SR)
+        self.assertTrue(1.5 <= lead <= 2.5, lead)
+        self.assertTrue(2.5 <= trail <= 3.5, trail)
+
+    def test_fade_detection(self):
+        decaying = [10000.0 * (1 - i / 400.0) for i in range(400)]
+        self.assertTrue(dsp.fade_out_likely(decaying, SR))
+        flat = [10000.0] * 400
+        self.assertFalse(dsp.fade_out_likely(flat, SR))
+
+    def test_abrupt_end(self):
+        self.assertTrue(dsp.abrupt_end([10000.0] * 100, SR))
+        tail_silent = [10000.0] * 80 + [0.0] * 20
+        self.assertFalse(dsp.abrupt_end(tail_silent, SR))
+
+
+class TestTaxonomy(unittest.TestCase):
+    def test_hard_stop_into_beat_is_a_cut(self):
+        mode, dur, _ = taxonomy.decide(taxonomy.OUTRO_HARDSTOP, taxonomy.INTRO_BEAT)
+        self.assertEqual(mode, taxonomy.MODE_CUT)
+
+    def test_fade_out_is_a_short_xfade(self):
+        mode, dur, _ = taxonomy.decide(taxonomy.OUTRO_FADE, taxonomy.INTRO_BEAT)
+        self.assertEqual(mode, taxonomy.MODE_XFADE)
+        self.assertEqual(dur, 2.0)
+
+    def test_ring_out_is_a_long_xfade(self):
+        mode, dur, _ = taxonomy.decide(taxonomy.OUTRO_RING, taxonomy.INTRO_BEAT)
+        self.assertEqual(mode, taxonomy.MODE_XFADE)
+        self.assertEqual(dur, 12.0)
+
+    def test_beat_run_into_beat_is_beat_mix(self):
+        mode, _, _ = taxonomy.decide(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT)
+        self.assertEqual(mode, taxonomy.MODE_BEAT)
+
+
+class TestGraph(unittest.TestCase):
+    def test_graph_includes_adelay_for_beat_alignment(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0}, {"path": "b", "gain_db": -1.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix",
+                           "duration": 8.0, "curve": "tri",
+                           "delay": 0.12, "align": "beat"}],
+        }
+        graph, out = render._build_graph(plan, 44100, 2)
+        self.assertIn("adelay=120:all=1", graph)
+        self.assertIn("acrossfade=d=8.000", graph)
+        self.assertEqual(out, "m0")
+
+    def test_graph_without_delay(self):
+        plan = {"tracks": [{"path": "a", "gain_db": 0.0}], "junctions": []}
+        graph, out = render._build_graph(plan, 44100, 2)
+        self.assertNotIn("adelay", graph)
+        self.assertEqual(out, "a0")
+
+
+if __name__ == "__main__":
+    unittest.main()
