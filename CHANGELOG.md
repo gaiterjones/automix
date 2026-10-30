@@ -6,6 +6,11 @@ aims to follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Per-junction **`trim_out`** (seconds): trims the outgoing stream before the
+  crossfade so the incoming track comes in earlier. It is an optional field in
+  the plan JSON and is applied by `render` with `atrim`.
+
 ## [0.1.0] — 2026-10-30
 
 Initial release.

@@ -111,6 +111,18 @@ class TestGraph(unittest.TestCase):
         self.assertIn("acrossfade=d=8.000", graph)
         self.assertEqual(out, "m0")
 
+    def test_graph_trim_out_shifts_incoming(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 173.4},
+                       {"path": "b", "gain_db": 0.0, "duration": 174.5}],
+            "junctions": [{"from": 0, "to": 1, "mode": "xfade", "duration": 2.0,
+                           "curve": "tri", "trim_out": 1.0}],
+        }
+        graph, out = render._build_graph(plan, 44100, 2)
+        self.assertIn("atrim=0:172.400", graph)   # 173.4 - 1.0
+        self.assertIn("acrossfade=d=2.000", graph)
+        self.assertEqual(out, "m0")
+
     def test_graph_without_delay(self):
         plan = {"tracks": [{"path": "a", "gain_db": 0.0}], "junctions": []}
         graph, out = render._build_graph(plan, 44100, 2)

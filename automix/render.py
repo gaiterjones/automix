@@ -44,14 +44,26 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
         parts.append(f"[{i}]{chain}[a{i}]")
         labels.append(f"a{i}")
 
+    lengths = [float(t.get("duration") or 0.0) for t in plan["tracks"]]
     cur = labels[0]
+    cur_len = lengths[0] if lengths else 0.0
     for j, junc in enumerate(plan.get("junctions") or []):
         nxt = labels[junc["to"]]
         dur = max(0.02, float(junc.get("duration", 6.0)))
         curve = junc.get("curve", "tri")
+
+        # optional manual nudge: bring the incoming track in earlier by trimming
+        # the outgoing stream (and everything mixed so far) by `trim_out` seconds
+        trim = float(junc.get("trim_out") or 0.0)
+        if trim > 0.0 and cur_len > trim + 0.1:
+            trimmed = f"t{j}"
+            parts.append(f"[{cur}]atrim=0:{cur_len - trim:.3f},asetpts=PTS-STARTPTS[{trimmed}]")
+            cur, cur_len = trimmed, cur_len - trim
+
         out = f"m{j}"
         parts.append(f"[{cur}][{nxt}]acrossfade=d={dur:.3f}:c1={curve}:c2={curve}[{out}]")
         cur = out
+        cur_len += (lengths[junc["to"]] if junc["to"] < len(lengths) else 0.0) - dur
 
     return ";".join(parts), cur
 

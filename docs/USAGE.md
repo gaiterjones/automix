@@ -85,7 +85,9 @@ render(plan, "out/mix.mp3")
       "curve": "tri",             // ffmpeg acrossfade curve
       "reason": "beat_run -> beat_from_start",
       "delay": 0.12,              // optional: beat-align nudge (seconds)
-      "align": "beat"             // present iff delay is set
+      "align": "beat",            // present iff delay is set
+      "trim_out": 1.0             // optional: bring the incoming track in
+                                  // earlier by trimming the outgoing by N s
     }
   ]
 }
