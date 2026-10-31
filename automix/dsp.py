@@ -192,6 +192,28 @@ def fade_out_likely(env: list[float], sr: int, hop: int = HOP,
     return (end / (start or 1e-9) < drop_ratio) and (decreasing / (len(tail) - 1) >= trend)
 
 
+def noise_tail_span(samples: array, sr: int, block: float = 0.25,
+                    zcr_tonal: float = 0.30) -> float:
+    """Seconds of a trailing non-tonal (noise / cymbal-splash) run at the end.
+
+    Walks backwards from the end while the blocks are non-tonal (high zero
+    crossing rate) and stops at the first tonal block. A cymbal crash or noise
+    FX reads 0.4-0.7 ZCR; tonal material (even a bright arp fading out) stays
+    under ~0.25. No level floor: a splash decays below any sensible floor while
+    still being noise, and silence has a zero crossing rate of ~0.
+    """
+    n = int(sr * block)
+    if n < 2 or len(samples) < n * 4:
+        return 0.0
+    run = 0
+    for start in range(len(samples) - n, -1, -n):
+        if zero_crossing_rate(samples[start:start + n]) >= zcr_tonal:
+            run += 1
+        else:
+            break
+    return round(run * block, 3)
+
+
 def fade_span(env: list[float], sr: int, hop: int = HOP,
               level: float = 0.5) -> float:
     """Seconds from the last time the envelope was >= ``level`` * peak to the end.

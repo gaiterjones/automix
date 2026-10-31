@@ -10,6 +10,13 @@ aims to follow [Semantic Versioning](https://semver.org/).
 - Per-junction **`trim_out`** (seconds): trims the outgoing stream before the
   crossfade so the incoming track comes in earlier. It is an optional field in
   the plan JSON and is applied by `render` with `atrim`.
+- **Splash / noise-FX ending detection** (`noise_tail`): a track that ends on a
+  cymbal crash or noise FX — a trailing run of high zero-crossing-rate audio —
+  has that tail trimmed, and its outro is judged on the music *before* the
+  splash. The planner sets `trim_out` so the mix is faded out before the crash.
+  (A cymbal reads 0.4–0.7 ZCR; tonal material, even a bright arp fade, stays
+  under ~0.25.) On the arpnotic set this trims 6.5 s from track 5 and 3.8 s from
+  track 2, and 5→6 now genuinely beat-matches.
 
 ### Changed
 - **Fade detection** now uses a longer (20 s) window and a start-vs-end level

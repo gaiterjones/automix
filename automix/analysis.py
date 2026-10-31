@@ -45,6 +45,7 @@ def _features(samples, sr: int) -> dict:
         "trail_silence": trail,
         "fade": dsp.fade_out_likely(env, sr),
         "fade_span": dsp.fade_span(env, sr),
+        "noise_tail": dsp.noise_tail_span(samples, sr),
         "abrupt": dsp.abrupt_end(env, sr),
     }
 
@@ -105,6 +106,19 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
 
     # outro - the actual ending (last ~12s), plus a 30s tail for context
     end = _features(ffmpeg.decode_pcm(path, max(0.0, dur - edge), edge, sr), sr)
+
+    # If the very end is a cymbal splash / noise FX (abrupt jump to broadband
+    # noise), judge the outro from the music BEFORE it - the splash should be
+    # trimmed away, not blended. Keep noise_tail so the planner can trim it.
+    noise_tail = float(end.get("noise_tail") or 0.0)
+    if noise_tail >= 1.0:
+        # +1s margin: the ZCR run stops where the crash becomes tonal-ish, but
+        # the crash onset is a little earlier. Judge (and trim) from before it.
+        noise_tail = round(min(noise_tail + 1.0, edge), 2)
+        body = _features(ffmpeg.decode_pcm(path, max(0.0, dur - noise_tail - edge), edge, sr), sr)
+        body["noise_tail"] = noise_tail
+        end = body
+
     tail = _features(ffmpeg.decode_pcm(path, max(0.0, dur - window), window, sr), sr)
 
     # beat grids at the head (incoming) and tail (outgoing) for beat alignment

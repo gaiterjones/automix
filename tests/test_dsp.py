@@ -77,6 +77,14 @@ class TestEnvelopeFeatures(unittest.TestCase):
         tail_silent = [10000.0] * 80 + [0.0] * 20
         self.assertFalse(dsp.abrupt_end(tail_silent, SR))
 
+    def test_noise_tail_span(self):
+        import random
+        random.seed(1)
+        tone = array("h", [int(8000 * math.sin(2 * math.pi * 220 * i / SR)) for i in range(SR)])
+        noise = array("h", [random.randint(-8000, 8000) for _ in range(SR // 2)])
+        self.assertEqual(dsp.noise_tail_span(tone, SR), 0.0)      # tonal ending
+        self.assertGreater(dsp.noise_tail_span(tone + noise, SR), 0.3)  # noise tail
+
     def test_fade_span(self):
         self.assertEqual(dsp.fade_span([10000.0] * 100, SR), 0.0)
         decaying = [10000.0] * 50 + [10000.0 * (1 - i / 50) for i in range(50)]

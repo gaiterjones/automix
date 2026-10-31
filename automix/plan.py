@@ -72,6 +72,15 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             if end.get("fade") and span > duration:
                 junc["duration"] = round(min(max(span, 2.0), 16.0), 2)
                 junc["reason"] = junc["reason"] + " | fade-aware overlap"
+
+        # Splash / noise-FX endings: end the outgoing before the splash rather
+        # than blending a cymbal crash into the next track - it does not belong
+        # in the mix. `noise_tail` is the seconds of trailing non-tonal audio.
+        if "trim_out" not in junc:
+            noise_tail = float((fingerprints[i].get("end") or {}).get("noise_tail") or 0.0)
+            if noise_tail >= 1.0:
+                junc["trim_out"] = round(noise_tail, 2)
+                junc["reason"] = junc["reason"] + f" | trimmed {noise_tail:.1f}s splash tail"
         junctions.append(junc)
 
     return {
