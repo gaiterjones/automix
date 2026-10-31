@@ -7,6 +7,8 @@ automix analyze  <tracks...> [--window S] [-o FILE]
 automix plan     <tracks...> [--window S] [--target-lufs LUFS] [--beat-align|--no-beat-align] [-o FILE]
 automix mix      <tracks...> [-o FILE] [--window S] [--target-lufs LUFS]
                              [--beat-align|--no-beat-align] [--bitrate B] [--plan-out FILE]
+automix preview  <tracks...> [-o FILE] [--pre S] [--post S] [--gap S]
+                             [--beat-align|--no-beat-align] [--tempo-match] [--bass-cut HZ]
 automix --version
 ```
 
@@ -42,6 +44,19 @@ automix mix album/*.mp3 -o out/mix.mp3 --target-lufs -11 --window 45 --beat-alig
 
 Progress goes to stderr, JSON to stdout, so `automix analyze ... > f.json` is
 clean.
+
+### Auditioning transitions only
+
+```bash
+automix preview album/*.mp3 -o out/transitions.mp3
+```
+
+Renders **only the junctions** — `--pre 6 --post 8` seconds either side of each
+blend, joined by `--gap 0.6` s of silence — so you can check the transitions
+without sitting through the whole mix. It accepts the same `--beat-align`,
+`--tempo-match`, `--bass-cut` and `--plan-out` options as `mix`. The full mix is
+rendered once to a lossless temp file, then the windows are cut and joined; a
+19-minute mix becomes a ~2-minute preview.
 
 ## Output formats
 

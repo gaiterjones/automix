@@ -10,7 +10,9 @@ A hard "cut" is just a very short crossfade (20ms), which is click-free.
 """
 from __future__ import annotations
 
+import os
 import subprocess
+import tempfile
 
 from .ffmpeg import binary as _binary
 
@@ -155,6 +157,71 @@ def render(plan: dict, out_path: str, sr: int = 44100, channels: int = 2,
 def _ext(path: str) -> str:
     import os
     return os.path.splitext(path)[1].lower()
+
+
+def junction_windows(plan: dict, pre: float = 6.0, post: float = 8.0) -> list[tuple]:
+    """(start, end) on the OUTPUT timeline around each junction.
+
+    Mirrors _build_graph's length bookkeeping: trims shorten the outgoing,
+    warps shorten a track's timeline, and each junction removes `duration`
+    seconds of overlap.
+    """
+    warps = {j["to"]: float(j["tempo_factor"])
+             for j in plan.get("junctions") or [] if j.get("tempo_factor")}
+    lens = [float(t.get("duration") or 0.0) / warps.get(i, 1.0)
+            for i, t in enumerate(plan.get("tracks") or [])]
+    if not lens:
+        return []
+    cur, out = lens[0], []
+    for j in plan.get("junctions") or []:
+        d = float(j.get("duration", 0.0))
+        cur -= float(j.get("trim_out") or 0.0)
+        start = cur - d
+        out.append((max(0.0, start - pre), start + d + post))
+        cur += (lens[j["to"]] if j["to"] < len(lens) else 0.0) - d
+    return out
+
+
+def render_preview(plan: dict, out_path: str, pre: float = 6.0, post: float = 8.0,
+                   gap: float = 0.6, bitrate: str = "320k", sr: int = 44100) -> str:
+    """Render ONLY the junctions, concatenated with short gaps, for auditioning.
+
+    The full mix is rendered once to a lossless temp file, then each junction
+    window is cut and the pieces are concatenated. For a 19-minute mix this
+    yields a ~90-second preview.
+    """
+    ff = _binary("ffmpeg")
+    windows = junction_windows(plan, pre, post)
+    if not windows:
+        raise RenderError("plan has no junctions")
+
+    tmp = tempfile.mkdtemp(prefix="automix-preview-")
+    mix = os.path.join(tmp, "mix.wav")
+    render(plan, mix, sr=sr)
+
+    silence = os.path.join(tmp, "gap.wav")
+    _ff([ff, "-y", "-hide_banner", "-loglevel", "error", "-f", "lavfi",
+         "-i", f"anullsrc=r={sr}:cl=stereo", "-t", f"{max(0.0, gap):.3f}",
+         "-c:a", "pcm_s16le", silence])
+
+    segments = []
+    for i, (start, end) in enumerate(windows):
+        seg = os.path.join(tmp, f"seg{i:02d}.wav")
+        _ff([ff, "-y", "-hide_banner", "-loglevel", "error",
+             "-ss", f"{start:.3f}", "-t", f"{max(0.05, end - start):.3f}",
+             "-i", mix, "-c:a", "pcm_s16le", seg])
+        segments.append(seg)
+
+    listing = os.path.join(tmp, "list.txt")
+    with open(listing, "w", encoding="utf-8") as fh:
+        for i, seg in enumerate(segments):
+            fh.write(f"file '{seg}'\n")
+            if i < len(segments) - 1 and gap > 0:
+                fh.write(f"file '{silence}'\n")
+
+    _ff([ff, "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
+         "-i", listing, "-c:a", "libmp3lame", "-b:a", bitrate, out_path])
+    return out_path
 
 
 def plan_duration(plan: dict) -> float:

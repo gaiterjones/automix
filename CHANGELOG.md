@@ -10,6 +10,9 @@ aims to follow [Semantic Versioning](https://semver.org/).
 - Per-junction **`trim_out`** (seconds): trims the outgoing stream before the
   crossfade so the incoming track comes in earlier. It is an optional field in
   the plan JSON and is applied by `render` with `atrim`.
+- **`preview` subcommand**: renders only the junctions — `--pre`/`--post`
+  seconds either side of each blend, joined by short gaps — so transitions can
+  be auditioned without listening to the whole mix.
 - **Bass cut** (`--bass-cut HZ`): on a `beat_mix` junction, sweep a high-pass up
   across the outgoing track so its kick/bass clears out and the incoming bass
   takes over cleanly — the classic DJ filter move. Implemented as staged

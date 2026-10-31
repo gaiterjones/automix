@@ -70,6 +70,26 @@ def cmd_mix(args) -> int:
     return 0
 
 
+def cmd_preview(args) -> int:
+    fps = _analyze(args.tracks, args.window)
+    plan = planmod.build_plan(args.tracks, fps, target_lufs=args.target_lufs,
+                              window=args.window, beat_align=args.beat_align,
+                              tempo_match=args.tempo_match, bass_cut_hz=args.bass_cut)
+
+    _log("\njunctions:")
+    for j in plan["junctions"]:
+        _log(f"  {j['from']+1} -> {j['to']+1}: {j['mode']} {j['duration']}s  [{j['reason']}]")
+    if args.plan_out:
+        planmod.dump_plan(plan, args.plan_out)
+
+    _log(f"\nrendering transition preview -> {args.output}")
+    render.render_preview(plan, args.output, pre=args.pre, post=args.post,
+                          gap=args.gap, bitrate=args.bitrate)
+    got = analysis.ffmpeg.ffprobe_metadata(args.output).get("duration")
+    _log(f"done: {args.output}  ({got}s, {len(plan['junctions'])} transitions)")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="automix",
                                 description="Intelligent sequential audio mixer")
@@ -109,6 +129,24 @@ def main(argv=None) -> int:
     m.add_argument("--plan-out")
     m.add_argument("--bitrate", default="320k")
     m.set_defaults(func=cmd_mix)
+
+    pv = sub.add_parser("preview", help="render only the junctions, for auditioning")
+    pv.add_argument("tracks", nargs="+")
+    pv.add_argument("-o", "--output", default="transitions.mp3")
+    pv.add_argument("--pre", type=float, default=6.0, help="seconds before each junction")
+    pv.add_argument("--post", type=float, default=8.0, help="seconds after each junction")
+    pv.add_argument("--gap", type=float, default=0.6, help="silence between previews")
+    pv.add_argument("--window", type=float, default=30.0)
+    pv.add_argument("--target-lufs", type=float, default=-14.0)
+    pv.add_argument("--beat-align", action=argparse.BooleanOptionalAction, default=False,
+                    help="beat-align beat_mix junctions")
+    pv.add_argument("--tempo-match", action=argparse.BooleanOptionalAction, default=False,
+                    help="warp the incoming track to the outgoing tempo on beat_mix junctions")
+    pv.add_argument("--bass-cut", type=int, default=0, metavar="HZ",
+                    help="sweep a high-pass up to HZ across the outgoing on beat_mix junctions")
+    pv.add_argument("--plan-out")
+    pv.add_argument("--bitrate", default="320k")
+    pv.set_defaults(func=cmd_preview)
 
     args = p.parse_args(argv)
     return args.func(args)

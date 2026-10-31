@@ -199,6 +199,25 @@ class TestBeatgrid(unittest.TestCase):
         self.assertAlmostEqual(((0.0 + d1) - (a_next - t0)) % P, 0.0, places=3)
 
 
+class TestPreviewWindows(unittest.TestCase):
+    def test_windows_account_for_trim_warp_and_overlap(self):
+        plan = {
+            "tracks": [{"duration": 100.0}, {"duration": 100.0}, {"duration": 100.0}],
+            "junctions": [
+                # tempo_factor warps the INCOMING track (index 1 here)
+                {"from": 0, "to": 1, "duration": 8.0, "trim_out": 6.5, "tempo_factor": 2.0},
+                {"from": 1, "to": 2, "duration": 8.0},
+            ],
+        }
+        w = render.junction_windows(plan, pre=0.0, post=0.0)
+        # j0: cur=100 -6.5 trim -> 93.5, start 85.5, end 93.5
+        self.assertAlmostEqual(w[0][0], 85.5, places=2)
+        self.assertAlmostEqual(w[0][1], 93.5, places=2)
+        # j1: cur = 93.5 + (100/2.0) - 8.0 = 135.5, start 127.5
+        self.assertAlmostEqual(w[1][0], 127.5, places=2)
+        self.assertAlmostEqual(w[1][1], 135.5, places=2)
+
+
 class TestPlan(unittest.TestCase):
     @staticmethod
     def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None):
