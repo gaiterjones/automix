@@ -73,6 +73,9 @@ automix plan 01.mp3 02.mp3 03.mp3 -o mix.plan.json
 
 # 3. Do it
 automix mix 01.mp3 02.mp3 03.mp3 -o out/mix.mp3
+
+# ...or just the transitions, for quick auditioning
+automix preview 01.mp3 02.mp3 03.mp3 -o out/transitions.mp3
 ```
 
 ```text
