@@ -1,5 +1,10 @@
-"""Unit tests - standard library only, no ffmpeg required."""
+"""Unit tests. Graph/DSP checks need no ffmpeg; the render length regression
+tests skip themselves when ffmpeg is not on PATH."""
 import math
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 from array import array
 
@@ -185,6 +190,34 @@ class TestGraph(unittest.TestCase):
         graph, _ = render._build_graph(plan, 44100, 2)
         self.assertIn("acrossfade", graph)
         self.assertIn("highpass@bc0 f 20", graph)
+        # the two full streams are crossfaded directly; pre-trimming them to the
+        # fade length made acrossfade collapse into a hard cut
+        self.assertNotIn("concat=n=3", graph)
+
+    def test_bass_cut_junction_keeps_the_full_length(self):
+        # regression: the bass-cut branch used to trim both sides to `duration`
+        # and crossfade the stubs, so the result lost `duration` seconds and
+        # became a hard cut. The output must be lenA + lenB - duration.
+        if not shutil.which("ffmpeg"):
+            self.skipTest("ffmpeg not available")
+        tmp = tempfile.mkdtemp()
+        a, b = os.path.join(tmp, "a.wav"), os.path.join(tmp, "b.wav")
+        for path, freq in ((a, 220), (b, 330)):
+            subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi",
+                            "-i", f"sine=frequency={freq}:duration=8", path], check=True)
+        plan = {
+            "tracks": [{"path": a, "gain_db": 0.0, "duration": 8.0},
+                       {"path": b, "gain_db": 0.0, "duration": 8.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix", "duration": 3.0,
+                           "curve": "tri", "bass_cut": 350}],
+        }
+        out = os.path.join(tmp, "mix.wav")
+        render.render(plan, out)
+        got = float(subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", out],
+            capture_output=True, text=True).stdout)
+        self.assertAlmostEqual(got, 13.0, delta=0.2)
 
     def test_graph_applies_trim_in(self):
         plan = {
@@ -206,7 +239,10 @@ class TestGraph(unittest.TestCase):
         graph, out = render._build_graph(plan, 44100, 2)
         self.assertIn("asendcmd=c='", graph)
         self.assertIn("highpass@bc0", graph)
-        self.assertIn("concat=n=3", graph)
+        # the sweep runs over the outgoing's LAST `duration` seconds (100 - 8 =
+        # 92), and the two full streams are crossfaded directly
+        self.assertIn("92.000 highpass@bc0 f 20", graph)
+        self.assertIn("[t0][a1]acrossfade=d=8.000", graph)
 
     def test_graph_fade_under(self):
         plan = {

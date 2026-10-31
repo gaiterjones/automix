@@ -27,11 +27,12 @@ def _ff(args: list[str]) -> None:
         raise RenderError((p.stderr or "ffmpeg failed").strip()[-1000:])
 
 
-def _hp_ramp(label: str, dur: float, target: int, nsteps: int = 30) -> str:
+def _hp_ramp(label: str, dur: float, target: int, offset: float = 0.0,
+             nsteps: int = 30) -> str:
     # highpass takes no time expression, so sweep it with staged commands: a
     # single command at t=dur lands on the last sample and never sweeps.
     return ";".join(
-        f"{dur * i / nsteps:.3f} highpass@{label} f "
+        f"{offset + dur * i / nsteps:.3f} highpass@{label} f "
         f"{int(round(20 + (target - 20) * i / (nsteps - 1)))}"
         for i in range(nsteps)
     )
@@ -142,20 +143,21 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
                          f"alimiter=limit=0.95[mm{j}]")
             parts.append(f"[p{j}][mm{j}][br{j}]concat=n=3:v=0:a=1[{out}]")
         elif bass_cut and nxt_len > dur and cur_len > dur:
-            # classic DJ move: sweep a high-pass up across the outgoing's tail so
-            # its kick/bass clears out and the incoming bass takes over cleanly.
-            a, b = f"aA{j}", f"aB{j}"
-            n1, n2 = f"n1{j}", f"n2{j}"
-            parts.append(f"[{cur}]asplit=2[{a}][{b}]")
-            parts.append(f"[{a}]atrim=0:{cur_len - dur:.3f},asetpts=PTS-STARTPTS[p{j}]")
-            parts.append(f"[{b}]atrim=start={cur_len - dur:.3f},asetpts=PTS-STARTPTS,"
-                         f"asendcmd=c='{_hp_ramp(f'bc{j}', dur, bass_cut)}',"
-                         f"highpass@bc{j}=f=20[t{j}]")
-            parts.append(f"[{nxt}]asplit=2[{n1}][{n2}]")
-            parts.append(f"[{n1}]atrim=0:{dur:.3f},asetpts=PTS-STARTPTS[bh{j}]")
-            parts.append(f"[{n2}]atrim=start={dur:.3f},asetpts=PTS-STARTPTS[br{j}]")
-            parts.append(f"[t{j}][bh{j}]acrossfade=d={dur:.3f}:c1={curve}:c2={curve}[mm{j}]")
-            parts.append(f"[p{j}][mm{j}][br{j}]concat=n=3:v=0:a=1[{out}]")
+            # classic DJ move: sweep a high-pass up across the outgoing's last
+            # `dur` seconds so its kick/bass clears out and the incoming bass
+            # takes over cleanly, then crossfade the two full streams. The sweep
+            # is timed against the junction's position on the outgoing timeline.
+            #
+            # This used to trim both sides to exactly `dur` and crossfade the
+            # stubs. Decoded audio runs a hair shorter than its nominal
+            # duration, so `acrossfade=d=dur` could not fit inside the stubs and
+            # silently emitted a near-empty segment - the junction degenerated
+            # into a hard cut that also dropped the outgoing's last `dur`
+            # seconds. Crossfading the full streams keeps the length identical
+            # to the plain xfade path.
+            cmds = _hp_ramp(f"bc{j}", dur, bass_cut, offset=cur_len - dur)
+            parts.append(f"[{cur}]asendcmd=c='{cmds}',highpass@bc{j}=f=20[t{j}]")
+            parts.append(f"[t{j}][{nxt}]acrossfade=d={dur:.3f}:c1={curve}:c2={curve}[{out}]")
         else:
             parts.append(f"[{cur}][{nxt}]acrossfade=d={dur:.3f}:c1={curve}:c2={curve}[{out}]")
         cur = out
