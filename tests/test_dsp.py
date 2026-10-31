@@ -199,6 +199,19 @@ class TestBeatgrid(unittest.TestCase):
         self.assertAlmostEqual(((0.0 + d1) - (a_next - t0)) % P, 0.0, places=3)
 
 
+class TestPlanDuration(unittest.TestCase):
+    def test_accounts_for_trim_and_warp(self):
+        plan = {
+            "tracks": [{"duration": 100.0}, {"duration": 100.0}, {"duration": 100.0}],
+            "junctions": [
+                {"from": 0, "to": 1, "duration": 8.0, "trim_out": 6.5, "tempo_factor": 2.0},
+                {"from": 1, "to": 2, "duration": 8.0},
+            ],
+        }
+        # 100 + 50 + 100 = 250, minus 16 overlap, minus 6.5 trim
+        self.assertAlmostEqual(render.plan_duration(plan), 227.5, places=2)
+
+
 class TestPreviewWindows(unittest.TestCase):
     def test_windows_account_for_trim_warp_and_overlap(self):
         plan = {

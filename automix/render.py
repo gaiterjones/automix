@@ -225,7 +225,16 @@ def render_preview(plan: dict, out_path: str, pre: float = 6.0, post: float = 8.
 
 
 def plan_duration(plan: dict) -> float:
-    """Expected output length: sum(track durations) - sum(overlaps)."""
-    total = sum(float(t.get("duration") or 0.0) for t in plan.get("tracks") or [])
+    """Expected output length.
+
+    sum(track durations, warped) - sum(overlaps) - sum(trims). Mirrors
+    junction_windows/_build_graph; ignoring trims and warps over-reports the
+    length (11.6 s on a real six-track mix).
+    """
+    warps = {j["to"]: float(j["tempo_factor"])
+             for j in plan.get("junctions") or [] if j.get("tempo_factor")}
+    total = sum(float(t.get("duration") or 0.0) / warps.get(i, 1.0)
+                for i, t in enumerate(plan.get("tracks") or []))
     overlap = sum(float(j.get("duration") or 0.0) for j in plan.get("junctions") or [])
-    return round(total - overlap, 2)
+    trim = sum(float(j.get("trim_out") or 0.0) for j in plan.get("junctions") or [])
+    return round(total - overlap - trim, 2)
