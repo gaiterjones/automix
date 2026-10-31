@@ -1,0 +1,40 @@
+{
+  "title": "automix",
+  "target_lufs": -14.0,
+  "tracks": [
+    {
+      "path": "input/ARPNOTIC/5. Arpnotic - Vampire Night-MATCHED-24bit.mp3",
+      "gain_db": -2.6,
+      "lufs": -11.4,
+      "bpm": 123.6,
+      "intro_class": "beat_from_start",
+      "outro_class": "beat_run",
+      "duration": 322.22
+    },
+    {
+      "path": "input/ARPNOTIC/6. Arpnotic -  Dark Vibe-MATCHED-24bit.mp3",
+      "gain_db": -3.4,
+      "lufs": -10.6,
+      "bpm": 122.4,
+      "intro_class": "beat_from_start",
+      "outro_class": "fade_out",
+      "duration": 173.95
+    }
+  ],
+  "junctions": [
+    {
+      "from": 0,
+      "to": 1,
+      "mode": "beat_mix",
+      "duration": 11.0,
+      "curve": "tri",
+      "reason": "beat_run -> beat_from_start | trimmed 6.5s splash tail | warped incoming +0.98% | bass cut to 350Hz",
+      "trim_out": 6.5,
+      "tempo_factor": 1.0098,
+      "warp": "122.4 -> 123.6 BPM",
+      "delay": 0.316,
+      "align": "beat",
+      "bass_cut": 350
+    }
+  ]
+}
