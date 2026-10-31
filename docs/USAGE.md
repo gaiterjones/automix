@@ -19,6 +19,7 @@ not reorder them).
 | `--window S` | `30` | head/tail analysis window in seconds |
 | `--target-lufs LUFS` | `-14` | loudness target for gain matching |
 | `--beat-align` / `--no-beat-align` | **off** | beat-align `beat_mix` junctions |
+| `--tempo-match` / `--no-tempo-match` | **off** | warp the incoming track to the outgoing tempo on `beat_mix` junctions |
 | `--bitrate B` | `320k` | output bitrate (mp3/aac) |
 | `--plan-out FILE` | — | also write the plan JSON |
 
@@ -86,6 +87,8 @@ render(plan, "out/mix.mp3")
       "reason": "beat_run -> beat_from_start",
       "delay": 0.12,              // optional: beat-align nudge (seconds)
       "align": "beat",            // present iff delay is set
+      "tempo_factor": 1.0098,     // optional: incoming warped to the outgoing
+                                  // tempo (atempo factor)
       "trim_out": 1.0             // optional: bring the incoming track in
                                   // earlier by trimming the outgoing by N s
     }

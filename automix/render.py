@@ -28,23 +28,32 @@ def _ff(args: list[str]) -> None:
 def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
     ch = "stereo" if channels == 2 else "mono"
 
-    # per-input delay (beat alignment): the incoming side of a beat_mix junction
+    # per-input delay (beat alignment) and tempo warp (atempo), both applied to
+    # the INCOMING side of a beat_mix junction
     delays: dict[int, float] = {}
+    warps: dict[int, float] = {}
     for junc in plan.get("junctions") or []:
         if junc.get("delay"):
             delays[junc["to"]] = float(junc["delay"])
+        if junc.get("tempo_factor"):
+            warps[junc["to"]] = float(junc["tempo_factor"])
 
     parts, labels = [], []
     for i, t in enumerate(plan["tracks"]):
         gain = float(t.get("gain_db", 0.0))
         chain = (f"aformat=sample_fmts=fltp:sample_rates={sr}:channel_layouts={ch},"
                  f"volume={gain}dB")
+        if i in warps:
+            chain += f",atempo={warps[i]:.6f}"
         if i in delays:
             chain += f",adelay={int(round(delays[i] * 1000))}:all=1"
         parts.append(f"[{i}]{chain}[a{i}]")
         labels.append(f"a{i}")
 
-    lengths = [float(t.get("duration") or 0.0) for t in plan["tracks"]]
+    # warping compresses a track's timeline by the factor, so later junction
+    # positions must use the effective length
+    lengths = [float(t.get("duration") or 0.0) / warps.get(i, 1.0)
+               for i, t in enumerate(plan["tracks"])]
     cur = labels[0]
     cur_len = lengths[0] if lengths else 0.0
     for j, junc in enumerate(plan.get("junctions") or []):

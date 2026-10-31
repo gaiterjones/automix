@@ -10,6 +10,11 @@ aims to follow [Semantic Versioning](https://semver.org/).
 - Per-junction **`trim_out`** (seconds): trims the outgoing stream before the
   crossfade so the incoming track comes in earlier. It is an optional field in
   the plan JSON and is applied by `render` with `atrim`.
+- **Tempo matching** (`--tempo-match`): on a `beat_mix` junction the incoming
+  track is warped (`atempo`, pitch preserved) to the outgoing tempo, gated on
+  |ΔBPM| ≤ 5% and tempo confidence. The plan records `tempo_factor`; render
+  applies it. With both grids locked the phase nudge no longer drifts through
+  the fade (previously ~39 ms over an 8 s fade at 1% difference).
 - **Splash / noise-FX ending detection** (`noise_tail`): a track that ends on a
   cymbal crash or noise FX — a trailing run of high zero-crossing-rate audio —
   has that tail trimmed, and its outro is judged on the music *before* the

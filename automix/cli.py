@@ -39,7 +39,8 @@ def cmd_analyze(args) -> int:
 def cmd_plan(args) -> int:
     fps = _analyze(args.tracks, args.window)
     plan = planmod.build_plan(args.tracks, fps, target_lufs=args.target_lufs,
-                              window=args.window, beat_align=args.beat_align)
+                              window=args.window, beat_align=args.beat_align,
+                              tempo_match=args.tempo_match)
     planmod.dump_plan(plan, args.output)
     _log(f"plan written to {args.output}")
     print(json.dumps(plan, indent=2))
@@ -49,7 +50,8 @@ def cmd_plan(args) -> int:
 def cmd_mix(args) -> int:
     fps = _analyze(args.tracks, args.window)
     plan = planmod.build_plan(args.tracks, fps, target_lufs=args.target_lufs,
-                              window=args.window, beat_align=args.beat_align)
+                              window=args.window, beat_align=args.beat_align,
+                              tempo_match=args.tempo_match)
 
     _log("\njunctions:")
     for j in plan["junctions"]:
@@ -86,6 +88,8 @@ def main(argv=None) -> int:
     pl.add_argument("--target-lufs", type=float, default=-14.0)
     pl.add_argument("--beat-align", action=argparse.BooleanOptionalAction, default=False,
                     help="nudge the incoming track so beats align on beat_mix junctions (default: off)")
+    pl.add_argument("--tempo-match", action=argparse.BooleanOptionalAction, default=False,
+                    help="warp the incoming track to the outgoing tempo on beat_mix junctions (default: off)")
     pl.add_argument("-o", "--output", default="mix.plan.json")
     pl.set_defaults(func=cmd_plan)
 
@@ -96,6 +100,8 @@ def main(argv=None) -> int:
     m.add_argument("--target-lufs", type=float, default=-14.0)
     m.add_argument("--beat-align", action=argparse.BooleanOptionalAction, default=False,
                    help="nudge the incoming track so beats align on beat_mix junctions (default: off)")
+    m.add_argument("--tempo-match", action=argparse.BooleanOptionalAction, default=False,
+                   help="warp the incoming track to the outgoing tempo on beat_mix junctions (default: off)")
     m.add_argument("--plan-out")
     m.add_argument("--bitrate", default="320k")
     m.set_defaults(func=cmd_mix)

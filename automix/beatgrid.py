@@ -86,7 +86,8 @@ def next_beat(grid: dict, t: float) -> float | None:
 
 
 def mix_delay(out_fp: dict, in_fp: dict, overlap: float, out_trim: float = 0.0,
-              min_strength: float = 1.5, max_drift: float = 0.03) -> float:
+              in_warp: float = 1.0, min_strength: float = 1.5,
+              max_drift: float = 0.03) -> float:
     """Seconds to delay the incoming track so its beat lands on the outgoing's.
 
     Returns 0.0 (no nudge) when either grid is weak or the tempos differ too
@@ -97,7 +98,8 @@ def mix_delay(out_fp: dict, in_fp: dict, overlap: float, out_trim: float = 0.0,
         return 0.0
     if ta.get("strength", 0) < min_strength or tb.get("strength", 0) < min_strength:
         return 0.0
-    if abs(ta["bpm"] - tb["bpm"]) / ta["bpm"] > max_drift:
+    # A tempo warp removes the drift, so only gate on it when we are not warping
+    if abs(in_warp - 1.0) < 1e-9 and abs(ta["bpm"] - tb["bpm"]) / ta["bpm"] > max_drift:
         return 0.0
 
     # the outgoing may be trimmed (splash tail) before the crossfade, so the
@@ -107,5 +109,7 @@ def mix_delay(out_fp: dict, in_fp: dict, overlap: float, out_trim: float = 0.0,
     a_next = next_beat(ta, t0)
     if a_next is None:
         return 0.0
-    b0 = tb["start"] + tb["phase"]           # incoming's first beat, from its start
+    # the incoming's first beat, from its start - scaled by the warp (atempo
+    # factor f compresses its timeline by 1/f)
+    b0 = (tb["start"] + tb["phase"]) / float(in_warp)
     return round((a_next - t0 - b0) % ta["period"], 3)

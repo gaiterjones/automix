@@ -14,7 +14,8 @@ from . import analysis, beatgrid, taxonomy
 def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
                target_lufs: float = -14.0, max_gain_db: float = 12.0,
                window: float = 30.0, title: str | None = None,
-               beat_align: bool = False) -> dict:
+               beat_align: bool = False, tempo_match: bool = False,
+               max_warp: float = 0.05) -> dict:
     if fingerprints is None:
         fingerprints = analysis.analyze_tracks(paths, window=window)
     if len(fingerprints) != len(paths):
@@ -68,13 +69,29 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             junc["trim_out"] = round(noise_tail, 2)
             junc["reason"] = junc["reason"] + f" | trimmed {noise_tail:.1f}s splash tail"
 
-        # Beat alignment - AFTER the duration/trim are fixed, so the phase
-        # reference is the EFFECTIVE outgoing end. Using the untrimmed length
-        # here put the nudge a splash-length out and the beats clashed.
+        # Tempo match: warp the INCOMING track to the outgoing tempo so the two
+        # beat grids stay locked through the fade, not just phase-aligned at its
+        # start. The outgoing is already playing, so only the incoming can move.
+        factor = 1.0
+        if tempo_match and junc["mode"] == taxonomy.MODE_BEAT:
+            ta = fp.get("tail_beat") or {}
+            tb = fingerprints[i + 1].get("head_beat") or {}
+            bo, bi = ta.get("bpm"), tb.get("bpm")
+            if bo and bi and ta.get("strength", 0) >= 1.5 and tb.get("strength", 0) >= 1.5:
+                f = bo / bi
+                if 0.0 < abs(f - 1.0) <= max_warp:
+                    factor = f
+                    junc["tempo_factor"] = round(f, 5)
+                    junc["warp"] = f"{bi} -> {bo} BPM"
+                    junc["reason"] = junc["reason"] + f" | warped incoming {(f - 1) * 100:+.2f}%"
+
+        # Beat alignment - AFTER the duration/trim/tempo are fixed, so the phase
+        # reference is the EFFECTIVE outgoing end (and the warped incoming grid).
         if beat_align and junc["mode"] == taxonomy.MODE_BEAT:
             delay = beatgrid.mix_delay(fingerprints[i], fingerprints[i + 1],
                                        junc["duration"],
-                                       out_trim=float(junc.get("trim_out") or 0.0))
+                                       out_trim=float(junc.get("trim_out") or 0.0),
+                                       in_warp=factor)
             if delay > 0.0:
                 junc["delay"] = delay
                 junc["align"] = "beat"

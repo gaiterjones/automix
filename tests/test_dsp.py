@@ -136,6 +136,18 @@ class TestGraph(unittest.TestCase):
         self.assertIn("acrossfade=d=2.000", graph)
         self.assertEqual(out, "m0")
 
+    def test_graph_applies_tempo_warp(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix", "duration": 8.0,
+                           "curve": "tri", "tempo_factor": 1.0098,
+                           "delay": 0.2, "align": "beat"}],
+        }
+        graph, out = render._build_graph(plan, 44100, 2)
+        self.assertIn("atempo=1.009800", graph)
+        self.assertIn("adelay=200:all=1", graph)
+
     def test_graph_fade_under(self):
         plan = {
             "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
