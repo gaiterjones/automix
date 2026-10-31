@@ -69,10 +69,16 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
             a, b = f"aA{j}", f"aB{j}"
             n1, n2 = f"n1{j}", f"n2{j}"
             fade_in = min(0.3, dur)
+            # Keep the outgoing at FULL level for most of the overlap so both
+            # tracks are genuinely audible together, then hand over in a short
+            # fade at the end. Fading it across the whole overlap makes the
+            # outgoing vanish immediately, which reads as "no mix at all".
+            fade_out = min(max(dur * 0.25, 1.5), 4.0)
+            fade_out_start = max(0.0, dur - fade_out)
             parts.append(f"[{cur}]asplit=2[{a}][{b}]")
             parts.append(f"[{a}]atrim=0:{cur_len - dur:.3f},asetpts=PTS-STARTPTS[p{j}]")
             parts.append(f"[{b}]atrim=start={cur_len - dur:.3f},asetpts=PTS-STARTPTS,"
-                         f"afade=t=out:st=0:d={dur:.3f}[t{j}]")
+                         f"afade=t=out:st={fade_out_start:.3f}:d={fade_out:.3f}[t{j}]")
             parts.append(f"[{nxt}]asplit=2[{n1}][{n2}]")
             parts.append(f"[{n1}]atrim=0:{dur:.3f},asetpts=PTS-STARTPTS,"
                          f"afade=t=in:st=0:d={fade_in:.3f}[bh{j}]")
