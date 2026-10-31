@@ -32,6 +32,13 @@ It is deliberately **rules-first**: a small, explainable decision table you can
 edit after listening — not a black box. The machinery to feed an LLM (or a
 human) as the planner is already there; it just isn't needed yet.
 
+## Demo
+
+[`examples/5-to-6-transition/`](examples/5-to-6-transition/) holds a 27 s
+excerpt of one real transition — beat-matched, tempo-warped ×1.0098, the
+outgoing track's cymbal splash trimmed away, and its bass swept out with a
+high-pass — together with the plan that produced it.
+
 ## Requirements
 
 - **ffmpeg** and **ffprobe** on `PATH` (any recent build; `rubberband` optional).

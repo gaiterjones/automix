@@ -7,12 +7,14 @@ dist/
 .venv/
 venv/
 
-# working data - never commit audio
+# working data - never commit generated audio
 input/
 out/
 tests/audio/
 tests/audio-beat/
 *.plan.json
+# ...except the documented demo
+!examples/**/*.plan.json
 
 # misc
 .DS_Store
