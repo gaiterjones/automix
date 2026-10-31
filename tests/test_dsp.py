@@ -335,12 +335,12 @@ class TestPreviewWindows(unittest.TestCase):
 
 class TestPlan(unittest.TestCase):
     @staticmethod
-    def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None):
+    def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None, trail=0.0):
         head = {"bpm": 123.0, "tempo_strength": 5.0}
         return {
             "path": "x", "duration": 100.0, "lufs_integrated": -14.0,
             "head": head, "intro_class": intro, "outro_class": outro,
-            "end": {"fade": fade, "fade_span": fade_span},
+            "end": {"fade": fade, "fade_span": fade_span, "trail_silence": trail},
             "tail": {"fade_span": tail_span if tail_span is not None else fade_span},
         }
 
@@ -360,6 +360,25 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(j["mode"], taxonomy.MODE_FADE_UNDER)
         self.assertGreaterEqual(j["duration"], 8.0)
         self.assertIn("fade-aware", j["reason"])
+
+    def test_trailing_silence_is_trimmed_from_the_overlap(self):
+        # a fade-out that dies before the file ends leaves dead air; anchoring
+        # the overlap to the file end puts it entirely inside that silence and
+        # nothing audible crossfades ("no mix at all")
+        fps = [self._fp(taxonomy.OUTRO_FADE, taxonomy.INTRO_BEAT, fade=True,
+                        fade_span=8.8, trail=3.669),
+               self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT)]
+        p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        j = p["junctions"][0]
+        self.assertAlmostEqual(float(j["trim_out"]), 3.67, places=2)
+        self.assertIn("trailing silence", j["reason"])
+
+    def test_no_trim_out_when_the_ending_runs_to_the_end(self):
+        fps = [self._fp(taxonomy.OUTRO_FADE, taxonomy.INTRO_BEAT, fade=True,
+                        fade_span=8.8, trail=0.4),
+               self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT)]
+        p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        self.assertIsNone(p["junctions"][0].get("trim_out"))
 
 
 if __name__ == "__main__":

@@ -69,6 +69,20 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             junc["trim_out"] = round(noise_tail, 2)
             junc["reason"] = junc["reason"] + f" | trimmed {noise_tail:.1f}s splash tail"
 
+        # Trailing silence: a track whose own fade dies out before the file ends
+        # leaves dead air at the end. An overlap anchored to the file end then
+        # sits entirely inside that silence, so nothing audible ever crossfades
+        # and the junction is heard as "no mix at all". Anchor to the end of the
+        # audio instead by trimming the dead tail.
+        # Only worth doing when the dead air is a meaningful share of the
+        # overlap; a second or so of near-silence under a long fade is fine and
+        # trimming it would shift junctions that already mix well.
+        trail = float(end.get("trail_silence") or 0.0)
+        if ("trim_out" not in junc and trail >= 1.0
+                and trail >= 0.35 * float(junc["duration"])):
+            junc["trim_out"] = round(trail, 2)
+            junc["reason"] = junc["reason"] + f" | trimmed {trail:.1f}s trailing silence"
+
         # NOTE: `trim_in` (enter on the kick) is deliberately NOT auto-applied.
         # A detector based on a level rise fires on ordinary arrangement lifts
         # (30s on one track, 31s on another), which would silently cut intros.
