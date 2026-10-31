@@ -159,6 +159,33 @@ class TestGraph(unittest.TestCase):
         self.assertIn("highpass@fi1=f=1200", graph)
         self.assertIn("asendcmd=c='", graph)
 
+    def test_mode_is_authoritative_over_bass_cut(self):
+        # a fade_under junction carrying a bass cut must still render as a
+        # fade_under (outgoing afaded out under a full-level incoming), not as
+        # a crossfade: bass_cut used to be tested before mode.
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "fade_under", "duration": 8.0,
+                           "curve": "tri", "bass_cut": 350}],
+        }
+        graph, _ = render._build_graph(plan, 44100, 2)
+        self.assertIn("amix=inputs=2", graph)
+        self.assertIn("afade=t=out", graph)
+        self.assertIn("highpass@bc0=f=20", graph)
+        self.assertNotIn("acrossfade", graph)
+
+    def test_beat_mix_with_bass_cut_uses_acrossfade(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix", "duration": 8.0,
+                           "curve": "tri", "bass_cut": 350}],
+        }
+        graph, _ = render._build_graph(plan, 44100, 2)
+        self.assertIn("acrossfade", graph)
+        self.assertIn("highpass@bc0 f 20", graph)
+
     def test_graph_applies_trim_in(self):
         plan = {
             "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
