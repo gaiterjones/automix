@@ -87,6 +87,7 @@ def estimate_tempo(env: list[float], sr: int, hop: int = HOP,
     avg = sum(candidates) / len(candidates)
     strength = (peak / avg) if avg > 0 else 0.0
 
+    scores: dict[int, float] = {}
     best_score, best_lag = -1.0, lag_min
     for lag in range(lag_min, lag_max + 1):
         score = 0.0
@@ -96,10 +97,22 @@ def estimate_tempo(env: list[float], sr: int, hop: int = HOP,
                 break
             score += w * acf[L]
         score *= _tempo_prior(60.0 / (lag * hop_sec), prefer_bpm, prior_octaves)
+        scores[lag] = score
         if score > best_score:
             best_score, best_lag = score, lag
 
-    return round(60.0 / (best_lag * hop_sec), 1), round(strength, 3)
+    # Parabolic interpolation around the peak for sub-lag resolution. Without
+    # it the 23 ms hop resolves only ~1.5% at 120 BPM, which is enough to
+    # misread a clean 127 BPM click track as 129.2 - and a wrong tempo ruins
+    # any attempt to beat-match or warp.
+    refined = float(best_lag)
+    if lag_min < best_lag < lag_max:
+        a, b, c = scores[best_lag - 1], scores[best_lag], scores[best_lag + 1]
+        denom = a - 2.0 * b + c
+        if denom != 0.0:
+            refined += 0.5 * (a - c) / denom
+
+    return round(60.0 / (refined * hop_sec), 1), round(strength, 3)
 
 
 def zero_crossing_rate(samples: array) -> float:

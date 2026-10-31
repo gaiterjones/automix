@@ -12,6 +12,12 @@ BEAT_WINDOW = 20.0
 # the envelope jittery and the fade test unreliable.)
 ENVELOPE_SECONDS = 1.0
 
+# Tempo uses its own, finer framing: a short (~93 ms) frame for transient
+# resolution and a 192-sample hop (~17 ms). At the default 23 ms hop the tempo
+# grid only resolves ~1.5% near 120 BPM, which is enough to read a clean 127
+# click track as 128-129 - and a wrong tempo ruins beat-matching.
+TEMPO_HOP = 192
+
 
 def _envelope(samples, sr: int) -> list[float]:
     return dsp.frame_rms(samples, frame=max(1, int(sr * ENVELOPE_SECONDS)))
@@ -93,7 +99,8 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
     # quiet or half-time opening reads as a different tempo), so measure the body.
     b_start = max(0.0, dur * 0.15)
     b_len = min(60.0, max(20.0, dur * 0.5))
-    bpm, strength = dsp.estimate_tempo(_envelope(ffmpeg.decode_pcm(path, b_start, b_len, sr), sr), sr)
+    tempo_env = dsp.frame_rms(ffmpeg.decode_pcm(path, b_start, b_len, sr), dsp.FRAME, TEMPO_HOP)
+    bpm, strength = dsp.estimate_tempo(tempo_env, sr, TEMPO_HOP)
     head["bpm"], head["tempo_strength"] = bpm, strength
 
     # outro - the actual ending (last ~12s), plus a 30s tail for context

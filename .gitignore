@@ -11,6 +11,7 @@ venv/
 input/
 out/
 tests/audio/
+tests/audio-beat/
 *.plan.json
 
 # misc

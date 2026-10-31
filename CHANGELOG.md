@@ -21,6 +21,10 @@ aims to follow [Semantic Versioning](https://semver.org/).
 - **Fade-aware overlap:** a fading ending now gets a crossfade that spans the
   detected fade, so the fade no longer starts after the outgoing has gone quiet
   (which left a ~20 dB hole in the level at the junction).
+- **Tempo accuracy:** estimation now uses a dedicated finer hop (192 samples,
+  ~17 ms) and parabolic interpolation around the autocorrelation peak. On clean
+  beat-only material a 127 BPM click track now reads 127.4 (was 129.2); real
+  album readings shift by ~1%, within the estimator's noise floor.
 - **`fade_under` transition** for fading endings: the incoming plays at full
   level while the outgoing fades out beneath it, instead of an equal-power
   crossfade that fades both sides (which scooped the level by 14–20 dB at real
