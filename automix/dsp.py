@@ -159,17 +159,41 @@ def onset_rate(env: list[float], sr: int, hop: int = HOP,
 
 
 def fade_out_likely(env: list[float], sr: int, hop: int = HOP,
-                    seconds: float = 8.0) -> bool:
-    """A steady, engineered fade over the last ``seconds``."""
+                    seconds: float = 20.0, drop_ratio: float = 0.35,
+                    trend: float = 0.6) -> bool:
+    """A sustained level drop over the last ``seconds``.
+
+    Compares the level near the start of the window with the end (rather than
+    requiring an almost-perfectly monotonic curve, which noise breaks), so a
+    long fade is caught even when it spans more than the ~12 s ending window.
+    """
     if not env:
         return False
     k = max(3, int(seconds / (hop / sr)))
     tail = env[-k:] if len(env) > k else env
     if len(tail) < 3:
         return False
+    start = sum(tail[:3]) / 3.0
+    end = sum(tail[-3:]) / 3.0
     decreasing = sum(1 for i in range(1, len(tail)) if tail[i] <= tail[i - 1])
-    end_ratio = (sum(tail[-3:]) / 3.0) / ((max(tail) or 1e-9))
-    return (decreasing / (len(tail) - 1)) > 0.75 and end_ratio < 0.35
+    return (end / (start or 1e-9) < drop_ratio) and (decreasing / (len(tail) - 1) >= trend)
+
+
+def fade_span(env: list[float], sr: int, hop: int = HOP,
+              level: float = 0.5) -> float:
+    """Seconds from the last time the envelope was >= ``level`` * peak to the end.
+
+    A proxy for how long the ending has been decaying - used to make a
+    crossfade cover a fade instead of starting after it.
+    """
+    if not env:
+        return 0.0
+    peak = max(env) or 1e-9
+    thr = peak * level
+    idx = len(env) - 1
+    while idx > 0 and env[idx] < thr:
+        idx -= 1
+    return round((len(env) - 1 - idx) * (hop / sr), 3)
 
 
 def abrupt_end(env: list[float], sr: int, hop: int = HOP,

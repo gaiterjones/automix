@@ -11,6 +11,17 @@ aims to follow [Semantic Versioning](https://semver.org/).
   crossfade so the incoming track comes in earlier. It is an optional field in
   the plan JSON and is applied by `render` with `atrim`.
 
+### Changed
+- **Fade detection** now uses a longer (20 s) window and a start-vs-end level
+  drop rather than an almost-monotonic curve, so long fades are caught. A
+  synth-arp fade-out that previously read as `beat_run` is now `fade_out`.
+- A `beat_mix` junction that cannot be beat-matched now falls back to `xfade`
+  (the plan records `fallback: "beat_mix unavailable"`) instead of implying a
+  beat mix it did not perform.
+- **Fade-aware overlap:** a fading ending now gets a crossfade that spans the
+  detected fade, so the fade no longer starts after the outgoing has gone quiet
+  (which left a ~20 dB hole in the level at the junction).
+
 ## [0.1.0] — 2026-10-30
 
 Initial release.

@@ -55,6 +55,23 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             if delay > 0.0:
                 junc["delay"] = delay
                 junc["align"] = "beat"
+
+        # If a beat_mix could not be beat-matched, it is plain a crossfade -
+        # say so, and fall back to a fade.
+        if junc["mode"] == taxonomy.MODE_BEAT and not junc.get("align"):
+            junc["mode"] = taxonomy.MODE_XFADE
+            junc["fallback"] = "beat_mix unavailable"
+
+        # A fading ending needs the overlap to span the fade, or the crossfade
+        # starts after the outgoing has already gone quiet (a hole in the level).
+        if junc["mode"] == taxonomy.MODE_XFADE:
+            fp = fingerprints[i]
+            end = fp.get("end") or {}
+            tail = fp.get("tail") or {}
+            span = float(tail.get("fade_span") or end.get("fade_span") or 0.0)
+            if end.get("fade") and span > duration:
+                junc["duration"] = round(min(max(span, 2.0), 16.0), 2)
+                junc["reason"] = junc["reason"] + " | fade-aware overlap"
         junctions.append(junc)
 
     return {

@@ -3,7 +3,7 @@ import math
 import unittest
 from array import array
 
-from automix import dsp, render, taxonomy
+from automix import dsp, plan as planmod, render, taxonomy
 
 SR = 11025
 HOP = dsp.HOP
@@ -77,6 +77,11 @@ class TestEnvelopeFeatures(unittest.TestCase):
         tail_silent = [10000.0] * 80 + [0.0] * 20
         self.assertFalse(dsp.abrupt_end(tail_silent, SR))
 
+    def test_fade_span(self):
+        self.assertEqual(dsp.fade_span([10000.0] * 100, SR), 0.0)
+        decaying = [10000.0] * 50 + [10000.0 * (1 - i / 50) for i in range(50)]
+        self.assertGreater(dsp.fade_span(decaying, SR), 0.5)
+
 
 class TestTaxonomy(unittest.TestCase):
     def test_hard_stop_into_beat_is_a_cut(self):
@@ -128,6 +133,35 @@ class TestGraph(unittest.TestCase):
         graph, out = render._build_graph(plan, 44100, 2)
         self.assertNotIn("adelay", graph)
         self.assertEqual(out, "a0")
+
+
+class TestPlan(unittest.TestCase):
+    @staticmethod
+    def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None):
+        head = {"bpm": 123.0, "tempo_strength": 5.0}
+        return {
+            "path": "x", "duration": 100.0, "lufs_integrated": -14.0,
+            "head": head, "intro_class": intro, "outro_class": outro,
+            "end": {"fade": fade, "fade_span": fade_span},
+            "tail": {"fade_span": tail_span if tail_span is not None else fade_span},
+        }
+
+    def test_unmatched_beat_mix_falls_back_to_xfade(self):
+        fps = [self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT),
+               self._fp(taxonomy.INTRO_BEAT, taxonomy.INTRO_BEAT)]
+        p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        j = p["junctions"][0]
+        self.assertEqual(j["mode"], taxonomy.MODE_XFADE)
+        self.assertEqual(j.get("fallback"), "beat_mix unavailable")
+
+    def test_fade_aware_overlap_extends_duration(self):
+        fps = [self._fp(taxonomy.OUTRO_FADE, taxonomy.INTRO_BEAT, fade=True, fade_span=8.8),
+               self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT)]
+        p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        j = p["junctions"][0]
+        self.assertEqual(j["mode"], taxonomy.MODE_XFADE)
+        self.assertGreaterEqual(j["duration"], 8.0)
+        self.assertIn("fade-aware", j["reason"])
 
 
 if __name__ == "__main__":

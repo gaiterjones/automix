@@ -38,6 +38,7 @@ def _features(samples, sr: int) -> dict:
         "lead_silence": lead,
         "trail_silence": trail,
         "fade": dsp.fade_out_likely(env, sr),
+        "fade_span": dsp.fade_span(env, sr),
         "abrupt": dsp.abrupt_end(env, sr),
     }
 
