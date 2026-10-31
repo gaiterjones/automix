@@ -88,9 +88,9 @@ class TestTaxonomy(unittest.TestCase):
         mode, dur, _ = taxonomy.decide(taxonomy.OUTRO_HARDSTOP, taxonomy.INTRO_BEAT)
         self.assertEqual(mode, taxonomy.MODE_CUT)
 
-    def test_fade_out_is_a_short_xfade(self):
+    def test_fade_out_fades_under(self):
         mode, dur, _ = taxonomy.decide(taxonomy.OUTRO_FADE, taxonomy.INTRO_BEAT)
-        self.assertEqual(mode, taxonomy.MODE_XFADE)
+        self.assertEqual(mode, taxonomy.MODE_FADE_UNDER)
         self.assertEqual(dur, 2.0)
 
     def test_ring_out_is_a_long_xfade(self):
@@ -128,6 +128,19 @@ class TestGraph(unittest.TestCase):
         self.assertIn("acrossfade=d=2.000", graph)
         self.assertEqual(out, "m0")
 
+    def test_graph_fade_under(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "fade_under",
+                           "duration": 8.0, "curve": "tri"}],
+        }
+        graph, out = render._build_graph(plan, 44100, 2)
+        self.assertIn("amix=inputs=2", graph)
+        self.assertIn("concat=n=3", graph)
+        self.assertIn("afade=t=out", graph)
+        self.assertEqual(out, "m0")
+
     def test_graph_without_delay(self):
         plan = {"tracks": [{"path": "a", "gain_db": 0.0}], "junctions": []}
         graph, out = render._build_graph(plan, 44100, 2)
@@ -159,7 +172,7 @@ class TestPlan(unittest.TestCase):
                self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT)]
         p = planmod.build_plan(["a", "b"], fps, beat_align=False)
         j = p["junctions"][0]
-        self.assertEqual(j["mode"], taxonomy.MODE_XFADE)
+        self.assertEqual(j["mode"], taxonomy.MODE_FADE_UNDER)
         self.assertGreaterEqual(j["duration"], 8.0)
         self.assertIn("fade-aware", j["reason"])
 

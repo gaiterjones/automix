@@ -64,7 +64,7 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
 
         # A fading ending needs the overlap to span the fade, or the crossfade
         # starts after the outgoing has already gone quiet (a hole in the level).
-        if junc["mode"] == taxonomy.MODE_XFADE:
+        if junc["mode"] in (taxonomy.MODE_XFADE, taxonomy.MODE_FADE_UNDER):
             fp = fingerprints[i]
             end = fp.get("end") or {}
             tail = fp.get("tail") or {}

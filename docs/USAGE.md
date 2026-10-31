@@ -80,7 +80,7 @@ render(plan, "out/mix.mp3")
   "junctions": [
     {
       "from": 0, "to": 1,
-      "mode": "beat_mix",         // cut | xfade | beat_mix
+      "mode": "beat_mix",         // cut | xfade | beat_mix | fade_under
       "duration": 8.0,            // seconds
       "curve": "tri",             // ffmpeg acrossfade curve
       "reason": "beat_run -> beat_from_start",

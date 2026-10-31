@@ -61,9 +61,29 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
             cur, cur_len = trimmed, cur_len - trim
 
         out = f"m{j}"
-        parts.append(f"[{cur}][{nxt}]acrossfade=d={dur:.3f}:c1={curve}:c2={curve}[{out}]")
+        nxt_len = lengths[junc["to"]] if junc["to"] < len(lengths) else 0.0
+        mode = junc.get("mode", "xfade")
+
+        if mode == "fade_under" and nxt_len > dur and cur_len > dur:
+            # prefix + (outgoing faded out UNDER the incoming at full level) + rest
+            a, b = f"aA{j}", f"aB{j}"
+            n1, n2 = f"n1{j}", f"n2{j}"
+            fade_in = min(0.3, dur)
+            parts.append(f"[{cur}]asplit=2[{a}][{b}]")
+            parts.append(f"[{a}]atrim=0:{cur_len - dur:.3f},asetpts=PTS-STARTPTS[p{j}]")
+            parts.append(f"[{b}]atrim=start={cur_len - dur:.3f},asetpts=PTS-STARTPTS,"
+                         f"afade=t=out:st=0:d={dur:.3f}[t{j}]")
+            parts.append(f"[{nxt}]asplit=2[{n1}][{n2}]")
+            parts.append(f"[{n1}]atrim=0:{dur:.3f},asetpts=PTS-STARTPTS,"
+                         f"afade=t=in:st=0:d={fade_in:.3f}[bh{j}]")
+            parts.append(f"[{n2}]atrim=start={dur:.3f},asetpts=PTS-STARTPTS[br{j}]")
+            parts.append(f"[t{j}][bh{j}]amix=inputs=2:duration=longest:normalize=0,"
+                         f"alimiter=limit=0.95[mm{j}]")
+            parts.append(f"[p{j}][mm{j}][br{j}]concat=n=3:v=0:a=1[{out}]")
+        else:
+            parts.append(f"[{cur}][{nxt}]acrossfade=d={dur:.3f}:c1={curve}:c2={curve}[{out}]")
         cur = out
-        cur_len += (lengths[junc["to"]] if junc["to"] < len(lengths) else 0.0) - dur
+        cur_len += nxt_len - dur
 
     return ";".join(parts), cur
 

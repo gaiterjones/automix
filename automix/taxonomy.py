@@ -33,6 +33,7 @@ OUTRO_CLASSES = (OUTRO_HARDSTOP, OUTRO_FADE, OUTRO_BEATRUN,
 MODE_CUT = "cut"        # (near) instant, click-free hard cut
 MODE_XFADE = "xfade"    # equal-power crossfade of a given length
 MODE_BEAT = "beat_mix"  # crossfade intended to sit on the beat grid
+MODE_FADE_UNDER = "fade_under"  # outgoing fades out under a full-level incoming
 
 # curves accepted by ffmpeg's acrossfade c1/c2
 CURVES = ("tri", "qsin", "hsin", "esin", "log", "ipar",
@@ -53,8 +54,10 @@ def decide(outro: str, intro: str) -> tuple[str, float, str]:
         return (MODE_XFADE, 3.0, "tri")
 
     if outro == OUTRO_FADE:
-        # it is already fading - slide the next one in early over the fade
-        return (MODE_XFADE, 2.0, "tri")
+        # it is already fading. A plain crossfade would fade BOTH sides, so a
+        # fade-out meeting a quiet head leaves a hole. Play the incoming at full
+        # level and fade the outgoing out underneath it instead.
+        return (MODE_FADE_UNDER, 2.0, "tri")
 
     if outro == OUTRO_VOCAL:
         if rhythmic:

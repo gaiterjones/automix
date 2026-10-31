@@ -38,6 +38,7 @@ Every track gets an **intro class** and an **outro class** (see
 | `cut` | click-free ≈20 ms crossfade (a hard cut) |
 | `xfade` | equal-power crossfade of a given length and curve |
 | `beat_mix` | crossfade intended to sit on the beat grid (see below) |
+| `fade_under` | outgoing fades out **under** a full-level incoming (for a fading ending) |
 
 `curve` is any ffmpeg `acrossfade` curve: `tri`, `qsin`, `hsin`, `esin`, `log`,
 `ipar`, `qua`, `cub`, `squ`, `cbr`, `par`, `exp`, `lin`, `sin`.
@@ -68,7 +69,11 @@ return (XFADE, 6.0)               # default
 Read it as prose:
 
 - **a hard-stopped track is already a cut point** → cut into a rhythmic opening;
-- **a track that fades** → start the next during the fade;
+- **a track that fades** → `fade_under`: the incoming plays at full level and
+  the outgoing fades out underneath it. (A plain equal-power crossfade fades
+  *both* sides, so a fade-out meeting a quiet head leaves a hole in the level —
+  measured ~14–20 dB at real junctions.) The overlap is made to span the detected
+  fade;
 - **a vocal tag** → cut if the next track opens on a beat, else a short crossfade;
 - **a ringing / breakdown tail** → a long, gentle overlap so it rings under;
 - **a beat run into a beat opening** → an 8 s beat mix;
