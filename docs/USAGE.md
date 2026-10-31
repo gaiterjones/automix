@@ -109,6 +109,8 @@ render(plan, "out/mix.mp3")
                                   // the outgoing (bass clears out)
       "trim_in": 15.0,            // optional: skip N s of the incoming's head
                                   // (enter where the kick starts)
+      "filter_in": 1200,          // optional: incoming enters thin (high-passed
+                                  // at 1200Hz) and opens to full bandwidth
       "trim_out": 1.0             // optional: bring the incoming track in
                                   // earlier by trimming the outgoing by N s
     }

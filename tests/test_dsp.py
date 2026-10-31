@@ -148,6 +148,17 @@ class TestGraph(unittest.TestCase):
         self.assertIn("atempo=1.009800", graph)
         self.assertIn("adelay=200:all=1", graph)
 
+    def test_graph_applies_filter_in(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix", "duration": 8.0,
+                           "curve": "tri", "filter_in": 1200}],
+        }
+        graph, _ = render._build_graph(plan, 44100, 2)
+        self.assertIn("highpass@fi1=f=1200", graph)
+        self.assertIn("asendcmd=c='", graph)
+
     def test_graph_applies_trim_in(self):
         plan = {
             "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},

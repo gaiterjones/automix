@@ -35,6 +35,7 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
     delays: dict[int, float] = {}
     warps: dict[int, float] = {}
     trims_in: dict[int, float] = {}
+    filters_in: dict[int, tuple] = {}
     for junc in plan.get("junctions") or []:
         if junc.get("delay"):
             delays[junc["to"]] = float(junc["delay"])
@@ -42,6 +43,10 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
             warps[junc["to"]] = float(junc["tempo_factor"])
         if junc.get("trim_in"):
             trims_in[junc["to"]] = float(junc["trim_in"])
+        if junc.get("filter_in"):
+            # (start Hz, sweep seconds) - a low-pass that opens over the fade
+            filters_in[junc["to"]] = (float(junc["filter_in"]),
+                                      max(0.1, float(junc.get("duration", 6.0))))
 
     parts, labels = [], []
     for i, t in enumerate(plan["tracks"]):
@@ -53,6 +58,20 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
         chain += f",volume={gain}dB"
         if i in warps:
             chain += f",atempo={warps[i]:.6f}"
+        if i in filters_in:
+            # filter fade-in: the incoming enters thin (high-passed) and opens
+            # downward to full bandwidth over the overlap. A low-pass version
+            # was tried first and left the incoming with only its lows, which
+            # scooped the level; a high-pass keeps the mids/highs present while
+            # the bass arrives last.
+            f0, fsec = filters_in[i]
+            nsteps = 30
+            cmds = ";".join(
+                f"{fsec * k / nsteps:.3f} highpass@fi{i} f "
+                f"{int(round(f0 + (20.0 - f0) * k / (nsteps - 1)))}"
+                for k in range(nsteps)
+            )
+            chain += f",asendcmd=c='{cmds}',highpass@fi{i}=f={int(f0)}"
         if i in delays:
             chain += f",adelay={int(round(delays[i] * 1000))}:all=1"
         parts.append(f"[{i}]{chain}[a{i}]")

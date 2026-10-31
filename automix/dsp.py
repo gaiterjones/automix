@@ -72,10 +72,16 @@ def estimate_tempo(env: list[float], sr: int, hop: int = HOP,
 
     lag_min = max(1, int(round(60.0 / (bpm_max * hop_sec))))
     lag_max = max(lag_min + 1, int(round(60.0 / (bpm_min * hop_sec))))
-    max_lag = lag_max * len(harmonics)
+
+    # Never ask for a lag the data cannot support: acf[lag] divides by
+    # (n - lag), so a short window used to raise ZeroDivisionError.
+    n = len(onsets)
+    max_lag = min(lag_max * len(harmonics), n - 1)
+    if max_lag <= lag_min:
+        return None, 0.0
+    lag_max = min(lag_max, max_lag)
 
     acf = [0.0] * (max_lag + 1)
-    n = len(onsets)
     for lag in range(1, max_lag + 1):
         s = 0.0
         for i in range(lag, n):
