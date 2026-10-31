@@ -156,6 +156,25 @@ class TestGraph(unittest.TestCase):
         self.assertEqual(out, "a0")
 
 
+class TestBeatgrid(unittest.TestCase):
+    def test_mix_delay_accounts_for_out_trim(self):
+        from automix import beatgrid
+        P = 60.0 / 123.0
+        out = {"duration": 100.0,
+               "tail_beat": {"bpm": 123.0, "period": P, "phase": 0.1, "start": 80.0, "strength": 5.0}}
+        inn = {"head_beat": {"bpm": 123.0, "period": P, "phase": 0.0, "start": 0.0, "strength": 5.0}}
+
+        d0 = beatgrid.mix_delay(out, inn, 8.0, out_trim=0.0)
+        d1 = beatgrid.mix_delay(out, inn, 8.0, out_trim=6.5)
+        # the splash trim moves the effective end, so the nudge must differ
+        self.assertGreater(abs(d0 - d1), 0.01)
+
+        # with the trim, the incoming beat lands exactly on an outgoing beat
+        t0 = (100.0 - 6.5) - 8.0
+        a_next = beatgrid.next_beat(out["tail_beat"], t0)
+        self.assertAlmostEqual(((0.0 + d1) - (a_next - t0)) % P, 0.0, places=3)
+
+
 class TestPlan(unittest.TestCase):
     @staticmethod
     def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None):

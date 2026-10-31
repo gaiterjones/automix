@@ -85,7 +85,7 @@ def next_beat(grid: dict, t: float) -> float | None:
     return s + k * P
 
 
-def mix_delay(out_fp: dict, in_fp: dict, overlap: float,
+def mix_delay(out_fp: dict, in_fp: dict, overlap: float, out_trim: float = 0.0,
               min_strength: float = 1.5, max_drift: float = 0.03) -> float:
     """Seconds to delay the incoming track so its beat lands on the outgoing's.
 
@@ -100,7 +100,9 @@ def mix_delay(out_fp: dict, in_fp: dict, overlap: float,
     if abs(ta["bpm"] - tb["bpm"]) / ta["bpm"] > max_drift:
         return 0.0
 
-    len_a = out_fp.get("duration") or 0.0
+    # the outgoing may be trimmed (splash tail) before the crossfade, so the
+    # effective end is shorter than the track duration
+    len_a = (out_fp.get("duration") or 0.0) - float(out_trim)
     t0 = len_a - overlap                     # overlap starts here in A
     a_next = next_beat(ta, t0)
     if a_next is None:

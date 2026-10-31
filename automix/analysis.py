@@ -121,10 +121,13 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
 
     tail = _features(ffmpeg.decode_pcm(path, max(0.0, dur - window), window, sr), sr)
 
-    # beat grids at the head (incoming) and tail (outgoing) for beat alignment
+    # beat grids at the head (incoming) and tail (outgoing) for beat alignment.
+    # The tail grid must not include a splash/noise tail - there are no beats in
+    # a cymbal crash, and fitting a grid to it skews the phase.
     bw = min(BEAT_WINDOW, dur)
     head_beat = beatgrid.detect(ffmpeg.decode_pcm(path, 0, bw, sr), sr, bpm=bpm, start=0.0)
-    tb_start = max(0.0, dur - bw)
+    tb_end = max(bw, dur - noise_tail)
+    tb_start = max(0.0, tb_end - bw)
     tail_beat = beatgrid.detect(ffmpeg.decode_pcm(path, tb_start, bw, sr), sr, bpm=bpm, start=tb_start)
 
     return {

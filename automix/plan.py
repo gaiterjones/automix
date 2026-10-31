@@ -48,10 +48,33 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             "curve": curve,
             "reason": f"{outro} -> {intro}",
         }
-        # beat alignment: nudge the incoming track so its beat lands on the
-        # outgoing track's beat through the crossfade.
-        if beat_align and mode == taxonomy.MODE_BEAT:
-            delay = beatgrid.mix_delay(fingerprints[i], fingerprints[i + 1], duration)
+        fp = fingerprints[i]
+        end = fp.get("end") or {}
+        tail = fp.get("tail") or {}
+
+        # A fading ending needs the overlap to span the fade, or the crossfade
+        # starts after the outgoing has already gone quiet (a hole in the level).
+        if junc["mode"] in (taxonomy.MODE_XFADE, taxonomy.MODE_FADE_UNDER):
+            span = float(tail.get("fade_span") or end.get("fade_span") or 0.0)
+            if end.get("fade") and span > junc["duration"]:
+                junc["duration"] = round(min(max(span, 2.0), 16.0), 2)
+                junc["reason"] = junc["reason"] + " | fade-aware overlap"
+
+        # Splash / noise-FX endings: end the outgoing before the splash rather
+        # than blending a cymbal crash into the next track - it does not belong
+        # in the mix. `noise_tail` is the seconds of trailing non-tonal audio.
+        noise_tail = float(end.get("noise_tail") or 0.0)
+        if "trim_out" not in junc and noise_tail >= 1.0:
+            junc["trim_out"] = round(noise_tail, 2)
+            junc["reason"] = junc["reason"] + f" | trimmed {noise_tail:.1f}s splash tail"
+
+        # Beat alignment - AFTER the duration/trim are fixed, so the phase
+        # reference is the EFFECTIVE outgoing end. Using the untrimmed length
+        # here put the nudge a splash-length out and the beats clashed.
+        if beat_align and junc["mode"] == taxonomy.MODE_BEAT:
+            delay = beatgrid.mix_delay(fingerprints[i], fingerprints[i + 1],
+                                       junc["duration"],
+                                       out_trim=float(junc.get("trim_out") or 0.0))
             if delay > 0.0:
                 junc["delay"] = delay
                 junc["align"] = "beat"
@@ -62,25 +85,6 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             junc["mode"] = taxonomy.MODE_XFADE
             junc["fallback"] = "beat_mix unavailable"
 
-        # A fading ending needs the overlap to span the fade, or the crossfade
-        # starts after the outgoing has already gone quiet (a hole in the level).
-        if junc["mode"] in (taxonomy.MODE_XFADE, taxonomy.MODE_FADE_UNDER):
-            fp = fingerprints[i]
-            end = fp.get("end") or {}
-            tail = fp.get("tail") or {}
-            span = float(tail.get("fade_span") or end.get("fade_span") or 0.0)
-            if end.get("fade") and span > duration:
-                junc["duration"] = round(min(max(span, 2.0), 16.0), 2)
-                junc["reason"] = junc["reason"] + " | fade-aware overlap"
-
-        # Splash / noise-FX endings: end the outgoing before the splash rather
-        # than blending a cymbal crash into the next track - it does not belong
-        # in the mix. `noise_tail` is the seconds of trailing non-tonal audio.
-        if "trim_out" not in junc:
-            noise_tail = float((fingerprints[i].get("end") or {}).get("noise_tail") or 0.0)
-            if noise_tail >= 1.0:
-                junc["trim_out"] = round(noise_tail, 2)
-                junc["reason"] = junc["reason"] + f" | trimmed {noise_tail:.1f}s splash tail"
         junctions.append(junc)
 
     return {
