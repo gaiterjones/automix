@@ -10,6 +10,11 @@ aims to follow [Semantic Versioning](https://semver.org/).
 - Per-junction **`trim_out`** (seconds): trims the outgoing stream before the
   crossfade so the incoming track comes in earlier. It is an optional field in
   the plan JSON and is applied by `render` with `atrim`.
+- **Bass cut** (`--bass-cut HZ`): on a `beat_mix` junction, sweep a high-pass up
+  across the outgoing track so its kick/bass clears out and the incoming bass
+  takes over cleanly — the classic DJ filter move. Implemented as staged
+  `highpass` commands driven by `asendcmd` (highpass has no time expression);
+  the plan records `bass_cut`.
 - **Tempo matching** (`--tempo-match`): on a `beat_mix` junction the incoming
   track is warped (`atempo`, pitch preserved) to the outgoing tempo, gated on
   |ΔBPM| ≤ 5% and tempo confidence. The plan records `tempo_factor`; render

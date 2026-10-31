@@ -148,6 +148,18 @@ class TestGraph(unittest.TestCase):
         self.assertIn("atempo=1.009800", graph)
         self.assertIn("adelay=200:all=1", graph)
 
+    def test_graph_bass_cut_sweeps_highpass(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix", "duration": 8.0,
+                           "curve": "tri", "bass_cut": 350}],
+        }
+        graph, out = render._build_graph(plan, 44100, 2)
+        self.assertIn("asendcmd=c='", graph)
+        self.assertIn("highpass@bc0", graph)
+        self.assertIn("concat=n=3", graph)
+
     def test_graph_fade_under(self):
         plan = {
             "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},

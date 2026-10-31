@@ -15,7 +15,7 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
                target_lufs: float = -14.0, max_gain_db: float = 12.0,
                window: float = 30.0, title: str | None = None,
                beat_align: bool = False, tempo_match: bool = False,
-               max_warp: float = 0.05) -> dict:
+               max_warp: float = 0.05, bass_cut_hz: int = 0) -> dict:
     if fingerprints is None:
         fingerprints = analysis.analyze_tracks(paths, window=window)
     if len(fingerprints) != len(paths):
@@ -101,6 +101,12 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
         if junc["mode"] == taxonomy.MODE_BEAT and not junc.get("align"):
             junc["mode"] = taxonomy.MODE_XFADE
             junc["fallback"] = "beat_mix unavailable"
+
+        # Bass cut: sweep a high-pass up across the outgoing on a beat mix so its
+        # kick clears out and the incoming bass takes over cleanly.
+        if bass_cut_hz and junc["mode"] == taxonomy.MODE_BEAT:
+            junc["bass_cut"] = int(bass_cut_hz)
+            junc["reason"] = junc["reason"] + f" | bass cut to {bass_cut_hz}Hz"
 
         junctions.append(junc)
 

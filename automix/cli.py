@@ -40,7 +40,7 @@ def cmd_plan(args) -> int:
     fps = _analyze(args.tracks, args.window)
     plan = planmod.build_plan(args.tracks, fps, target_lufs=args.target_lufs,
                               window=args.window, beat_align=args.beat_align,
-                              tempo_match=args.tempo_match)
+                              tempo_match=args.tempo_match, bass_cut_hz=args.bass_cut)
     planmod.dump_plan(plan, args.output)
     _log(f"plan written to {args.output}")
     print(json.dumps(plan, indent=2))
@@ -51,7 +51,7 @@ def cmd_mix(args) -> int:
     fps = _analyze(args.tracks, args.window)
     plan = planmod.build_plan(args.tracks, fps, target_lufs=args.target_lufs,
                               window=args.window, beat_align=args.beat_align,
-                              tempo_match=args.tempo_match)
+                              tempo_match=args.tempo_match, bass_cut_hz=args.bass_cut)
 
     _log("\njunctions:")
     for j in plan["junctions"]:
@@ -90,6 +90,8 @@ def main(argv=None) -> int:
                     help="nudge the incoming track so beats align on beat_mix junctions (default: off)")
     pl.add_argument("--tempo-match", action=argparse.BooleanOptionalAction, default=False,
                     help="warp the incoming track to the outgoing tempo on beat_mix junctions (default: off)")
+    pl.add_argument("--bass-cut", type=int, default=0, metavar="HZ",
+                    help="sweep a high-pass up to HZ across the outgoing on beat_mix junctions (default: 0 = off)")
     pl.add_argument("-o", "--output", default="mix.plan.json")
     pl.set_defaults(func=cmd_plan)
 
@@ -102,6 +104,8 @@ def main(argv=None) -> int:
                    help="nudge the incoming track so beats align on beat_mix junctions (default: off)")
     m.add_argument("--tempo-match", action=argparse.BooleanOptionalAction, default=False,
                    help="warp the incoming track to the outgoing tempo on beat_mix junctions (default: off)")
+    m.add_argument("--bass-cut", type=int, default=0, metavar="HZ",
+                   help="sweep a high-pass up to HZ across the outgoing on beat_mix junctions (default: 0 = off)")
     m.add_argument("--plan-out")
     m.add_argument("--bitrate", default="320k")
     m.set_defaults(func=cmd_mix)
