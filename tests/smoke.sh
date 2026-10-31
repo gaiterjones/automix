@@ -20,12 +20,21 @@ python3 -m automix mix tests/audio/*.mp3 -o /tmp/automix-smoke.mix.mp3
 
 python3 - <<'PY'
 import json, os
+from automix import taxonomy
+
 plan = json.load(open("/tmp/automix-smoke.plan.json"))
 mix = "/tmp/automix-smoke.mix.mp3"
+
+# validate against the taxonomy's own mode constants rather than a hard-coded
+# list, so adding a transition mode can never break CI silently
+valid_modes = {taxonomy.MODE_CUT, taxonomy.MODE_XFADE,
+               taxonomy.MODE_BEAT, taxonomy.MODE_FADE_UNDER}
+
 assert len(plan["tracks"]) == 5, plan["tracks"]
 assert len(plan["junctions"]) == 4, plan["junctions"]
-assert all(j["mode"] in ("cut", "xfade", "beat_mix") for j in plan["junctions"])
+assert all(j["mode"] in valid_modes for j in plan["junctions"]), [j["mode"] for j in plan["junctions"]]
 size = os.path.getsize(mix)
 assert size > 100_000, f"mix too small: {size}"
 print(f"smoke ok: {mix} ({size} bytes, {len(plan['junctions'])} junctions)")
+print("modes:", [j["mode"] for j in plan["junctions"]])
 PY
