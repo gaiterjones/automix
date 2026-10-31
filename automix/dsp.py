@@ -192,6 +192,29 @@ def fade_out_likely(env: list[float], sr: int, hop: int = HOP,
     return (end / (start or 1e-9) < drop_ratio) and (decreasing / (len(tail) - 1) >= trend)
 
 
+def kick_entry(samples: array, sr: int, block: float = 1.0,
+               rise_db: float = 4.0, sustain: int = 3) -> float:
+    """Seconds until a sustained low-band rise - where the kick comes in.
+
+    Feed it a low-passed (kick-band) signal. Returns 0.0 when the level is flat
+    from the start (a kick from bar one) or never rises.
+    """
+    n = int(sr * block)
+    if n < 2 or len(samples) < n * (sustain + 3):
+        return 0.0
+    levels = []
+    for i in range(0, len(samples) - n + 1, n):
+        seg = samples[i:i + n]
+        r = math.sqrt(sum(float(x) * float(x) for x in seg) / len(seg)) or 1e-9
+        levels.append(20.0 * math.log10(r / 32768.0))
+    base = sum(levels[:3]) / 3.0
+    thr = base + rise_db
+    for i in range(3, len(levels) - sustain):
+        if all(levels[i + j] > thr for j in range(sustain)):
+            return round(i * block, 2)
+    return 0.0
+
+
 def noise_tail_span(samples: array, sr: int, block: float = 0.25,
                     zcr_tonal: float = 0.30) -> float:
     """Seconds of a trailing non-tonal (noise / cymbal-splash) run at the end.

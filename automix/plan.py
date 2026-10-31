@@ -69,6 +69,12 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             junc["trim_out"] = round(noise_tail, 2)
             junc["reason"] = junc["reason"] + f" | trimmed {noise_tail:.1f}s splash tail"
 
+        # NOTE: `trim_in` (enter on the kick) is deliberately NOT auto-applied.
+        # A detector based on a level rise fires on ordinary arrangement lifts
+        # (30s on one track, 31s on another), which would silently cut intros.
+        # It is a per-junction plan field: set it where the ear says the intro
+        # should be skipped. `kick_entry` in the fingerprint is a hint only.
+
         # Tempo match: warp the INCOMING track to the outgoing tempo so the two
         # beat grids stay locked through the fade, not just phase-aligned at its
         # start. The outgoing is already playing, so only the incoming can move.
@@ -91,7 +97,8 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             delay = beatgrid.mix_delay(fingerprints[i], fingerprints[i + 1],
                                        junc["duration"],
                                        out_trim=float(junc.get("trim_out") or 0.0),
-                                       in_warp=factor)
+                                       in_warp=factor,
+                                       in_trim=float(junc.get("trim_in") or 0.0))
             if delay > 0.0:
                 junc["delay"] = delay
                 junc["align"] = "beat"

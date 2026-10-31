@@ -86,14 +86,19 @@ def next_beat(grid: dict, t: float) -> float | None:
 
 
 def mix_delay(out_fp: dict, in_fp: dict, overlap: float, out_trim: float = 0.0,
-              in_warp: float = 1.0, min_strength: float = 1.5,
-              max_drift: float = 0.03) -> float:
+              in_warp: float = 1.0, in_trim: float = 0.0,
+              min_strength: float = 1.5, max_drift: float = 0.03) -> float:
     """Seconds to delay the incoming track so its beat lands on the outgoing's.
 
     Returns 0.0 (no nudge) when either grid is weak or the tempos differ too
     much for an overlap to stay locked.
     """
-    ta, tb = out_fp.get("tail_beat"), in_fp.get("head_beat")
+    # entering mid-track (trim_in) means the local BODY grid is the right
+    # reference - the head may be a beatless intro
+    ta = out_fp.get("tail_beat")
+    tb = in_fp.get("body_beat") if in_trim > 0 else in_fp.get("head_beat")
+    if not tb:
+        tb = in_fp.get("body_beat") or in_fp.get("head_beat")
     if not ta or not tb or not ta.get("bpm") or not tb.get("bpm"):
         return 0.0
     if ta.get("strength", 0) < min_strength or tb.get("strength", 0) < min_strength:
@@ -109,7 +114,14 @@ def mix_delay(out_fp: dict, in_fp: dict, overlap: float, out_trim: float = 0.0,
     a_next = next_beat(ta, t0)
     if a_next is None:
         return 0.0
-    # the incoming's first beat, from its start - scaled by the warp (atempo
-    # factor f compresses its timeline by 1/f)
-    b0 = (tb["start"] + tb["phase"]) / float(in_warp)
+    if in_trim > 0:
+        # first body beat at/after the trim point, then scaled by the warp
+        b_next = next_beat(tb, float(in_trim))
+        if b_next is None:
+            return 0.0
+        b0 = (b_next - float(in_trim)) / float(in_warp)
+    else:
+        # the incoming's first beat, from its start - scaled by the warp
+        # (atempo factor f compresses its timeline by 1/f)
+        b0 = (tb["start"] + tb["phase"]) / float(in_warp)
     return round((a_next - t0 - b0) % ta["period"], 3)

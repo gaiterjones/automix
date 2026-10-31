@@ -107,6 +107,8 @@ render(plan, "out/mix.mp3")
                                   // tempo (atempo factor)
       "bass_cut": 350,            // optional: high-pass sweeps to 350Hz across
                                   // the outgoing (bass clears out)
+      "trim_in": 15.0,            // optional: skip N s of the incoming's head
+                                  // (enter where the kick starts)
       "trim_out": 1.0             // optional: bring the incoming track in
                                   // earlier by trimming the outgoing by N s
     }

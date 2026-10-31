@@ -104,6 +104,13 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
     bpm, strength = dsp.estimate_tempo(tempo_env, sr, TEMPO_HOP)
     head["bpm"], head["tempo_strength"] = bpm, strength
 
+    # beatless intros: when does the kick come in? (first sustained rise in the
+    # kick band) and a body beat grid to align against when entering mid-track
+    kick_entry = dsp.kick_entry(
+        ffmpeg.decode_pcm_filtered(path, "lowpass=f=120", 0.0, min(45.0, dur), sr), sr)
+    body_beat = beatgrid.detect(
+        ffmpeg.decode_pcm(path, b_start, min(20.0, b_len), sr), sr, bpm=bpm, start=b_start)
+
     # outro - the actual ending (last ~12s), plus a 30s tail for context
     end = _features(ffmpeg.decode_pcm(path, max(0.0, dur - edge), edge, sr), sr)
 
@@ -149,6 +156,8 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
         "tail": tail,
         "head_beat": head_beat,
         "tail_beat": tail_beat,
+        "body_beat": body_beat,
+        "kick_entry": kick_entry,
         "intro_class": classify_intro(head),
         "outro_class": classify_outro(end, head),
     }

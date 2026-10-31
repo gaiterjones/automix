@@ -138,6 +138,26 @@ def decode_pcm(path: str, start: float | None = None,
     return a
 
 
+def decode_pcm_filtered(path: str, af: str, start: float | None = None,
+                        duration: float | None = None,
+                        sr: int = DEFAULT_SR) -> array:
+    """Decode a window through an ffmpeg audio filter (e.g. a low-pass)."""
+    cmd = [_tool("ffmpeg"), "-v", "error"]
+    if start:
+        cmd += ["-ss", f"{start:.3f}"]
+    cmd += ["-i", path]
+    if duration is not None:
+        cmd += ["-t", f"{duration:.3f}"]
+    cmd += ["-af", af, "-ac", "1", "-ar", str(sr), "-f", "s16le", "-"]
+    p = subprocess.run(cmd, capture_output=True)
+    if p.returncode != 0:
+        raise FFmpegError(p.stderr.decode(errors="replace")[:400] or "ffmpeg decode failed")
+    raw = p.stdout
+    a = array("h")
+    a.frombytes(raw[: len(raw) // 2 * 2])
+    return a
+
+
 def transcoded_duration(path: str) -> float | None:
     """Duration via ffprobe (convenience)."""
     return ffprobe_metadata(path).get("duration")

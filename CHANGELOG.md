@@ -10,6 +10,12 @@ aims to follow [Semantic Versioning](https://semver.org/).
 - Per-junction **`trim_out`** (seconds): trims the outgoing stream before the
   crossfade so the incoming track comes in earlier. It is an optional field in
   the plan JSON and is applied by `render` with `atrim`.
+- **`trim_in` (plan field)**: skip N seconds of the incoming track's head so a
+  beatless intro can be bypassed and the mix enters where the kick starts. The
+  beat alignment then uses the incoming's **body** grid (where the kick is)
+  rather than the head grid. Deliberately not auto-detected: a level-rise
+  detector fired on ordinary arrangement lifts. `kick_entry` is exposed in the
+  fingerprint as a hint.
 - **`preview` subcommand**: renders only the junctions — `--pre`/`--post`
   seconds either side of each blend, joined by short gaps — so transitions can
   be auditioned without listening to the whole mix.

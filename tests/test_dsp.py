@@ -148,6 +148,16 @@ class TestGraph(unittest.TestCase):
         self.assertIn("atempo=1.009800", graph)
         self.assertIn("adelay=200:all=1", graph)
 
+    def test_graph_applies_trim_in(self):
+        plan = {
+            "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
+                       {"path": "b", "gain_db": 0.0, "duration": 80.0}],
+            "junctions": [{"from": 0, "to": 1, "mode": "beat_mix", "duration": 8.0,
+                           "curve": "tri", "trim_in": 15.0}],
+        }
+        graph, _ = render._build_graph(plan, 44100, 2)
+        self.assertIn("atrim=start=15.000", graph)
+
     def test_graph_bass_cut_sweeps_highpass(self):
         plan = {
             "tracks": [{"path": "a", "gain_db": 0.0, "duration": 100.0},
@@ -197,6 +207,24 @@ class TestBeatgrid(unittest.TestCase):
         t0 = (100.0 - 6.5) - 8.0
         a_next = beatgrid.next_beat(out["tail_beat"], t0)
         self.assertAlmostEqual(((0.0 + d1) - (a_next - t0)) % P, 0.0, places=3)
+
+
+class TestTrimInAlignment(unittest.TestCase):
+    def test_entering_mid_track_aligns_to_the_body_grid(self):
+        from automix import beatgrid
+        P = 0.5
+        out = {"duration": 100.0, "tail_beat": {"bpm": 120.0, "period": P,
+                                               "phase": 0.1, "start": 80.0, "strength": 5.0}}
+        inn = {"head_beat": {"bpm": 120.0, "period": P, "phase": 0.0, "start": 0.0, "strength": 5.0},
+               "body_beat": {"bpm": 120.0, "period": P, "phase": 0.2, "start": 20.0, "strength": 5.0}}
+        trim_in = 15.0
+        d = beatgrid.mix_delay(out, inn, 8.0, out_trim=0.0, in_warp=1.0, in_trim=trim_in)
+
+        t0 = 100.0 - 8.0
+        a_next = beatgrid.next_beat(out["tail_beat"], t0)
+        b_next = beatgrid.next_beat(inn["body_beat"], trim_in)
+        b0 = b_next - trim_in
+        self.assertAlmostEqual(((b0 + d) - (a_next - t0)) % P, 0.0, places=3)
 
 
 class TestPlanDuration(unittest.TestCase):

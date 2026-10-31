@@ -34,17 +34,23 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
     # the INCOMING side of a beat_mix junction
     delays: dict[int, float] = {}
     warps: dict[int, float] = {}
+    trims_in: dict[int, float] = {}
     for junc in plan.get("junctions") or []:
         if junc.get("delay"):
             delays[junc["to"]] = float(junc["delay"])
         if junc.get("tempo_factor"):
             warps[junc["to"]] = float(junc["tempo_factor"])
+        if junc.get("trim_in"):
+            trims_in[junc["to"]] = float(junc["trim_in"])
 
     parts, labels = [], []
     for i, t in enumerate(plan["tracks"]):
         gain = float(t.get("gain_db", 0.0))
-        chain = (f"aformat=sample_fmts=fltp:sample_rates={sr}:channel_layouts={ch},"
-                 f"volume={gain}dB")
+        chain = f"aformat=sample_fmts=fltp:sample_rates={sr}:channel_layouts={ch}"
+        if i in trims_in:
+            # enter on the kick: drop the beatless intro before anything else
+            chain += f",atrim=start={trims_in[i]:.3f},asetpts=PTS-STARTPTS"
+        chain += f",volume={gain}dB"
         if i in warps:
             chain += f",atempo={warps[i]:.6f}"
         if i in delays:
@@ -52,9 +58,9 @@ def _build_graph(plan: dict, sr: int, channels: int) -> tuple[str, str]:
         parts.append(f"[{i}]{chain}[a{i}]")
         labels.append(f"a{i}")
 
-    # warping compresses a track's timeline by the factor, so later junction
-    # positions must use the effective length
-    lengths = [float(t.get("duration") or 0.0) / warps.get(i, 1.0)
+    # trims-in shorten a track, and warping compresses its timeline, so later
+    # junction positions must use the effective length
+    lengths = [(float(t.get("duration") or 0.0) - trims_in.get(i, 0.0)) / warps.get(i, 1.0)
                for i, t in enumerate(plan["tracks"])]
     cur = labels[0]
     cur_len = lengths[0] if lengths else 0.0
@@ -168,7 +174,9 @@ def junction_windows(plan: dict, pre: float = 6.0, post: float = 8.0) -> list[tu
     """
     warps = {j["to"]: float(j["tempo_factor"])
              for j in plan.get("junctions") or [] if j.get("tempo_factor")}
-    lens = [float(t.get("duration") or 0.0) / warps.get(i, 1.0)
+    trims_in = {j["to"]: float(j["trim_in"])
+                for j in plan.get("junctions") or [] if j.get("trim_in")}
+    lens = [(float(t.get("duration") or 0.0) - trims_in.get(i, 0.0)) / warps.get(i, 1.0)
             for i, t in enumerate(plan.get("tracks") or [])]
     if not lens:
         return []
@@ -233,7 +241,9 @@ def plan_duration(plan: dict) -> float:
     """
     warps = {j["to"]: float(j["tempo_factor"])
              for j in plan.get("junctions") or [] if j.get("tempo_factor")}
-    total = sum(float(t.get("duration") or 0.0) / warps.get(i, 1.0)
+    trims_in = {j["to"]: float(j["trim_in"])
+                for j in plan.get("junctions") or [] if j.get("trim_in")}
+    total = sum((float(t.get("duration") or 0.0) - trims_in.get(i, 0.0)) / warps.get(i, 1.0)
                 for i, t in enumerate(plan.get("tracks") or []))
     overlap = sum(float(j.get("duration") or 0.0) for j in plan.get("junctions") or [])
     trim = sum(float(j.get("trim_out") or 0.0) for j in plan.get("junctions") or [])
