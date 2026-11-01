@@ -37,6 +37,33 @@ aims to follow [Semantic Versioning](https://semver.org/).
   under ~0.25.) On the arpnotic set this trims 6.5 s from track 5 and 3.8 s from
   track 2, and 5→6 now genuinely beat-matches.
 
+- **`filter_in` (plan field)**: the incoming track enters thin — high-passed at
+  N Hz — and opens downward to full bandwidth across the fade. A low-pass that
+  opens upward was tried first and scooped the level by ~10 dB, because it left
+  the incoming with only its lows while the mids and highs were missing; a
+  descending high-pass keeps the body of the track present and lets the bass
+  arrive last.
+- **Trailing-silence trimming**: when a track's own fade dies out before its
+  file ends, the planner trims the dead tail so the overlap anchors to the end
+  of the audio. Gated to trailing silence ≥ 1 s **and** ≥ 35 % of the overlap,
+  so it only fires where the dead air actually swallows the fade.
+
+### Fixed
+- **Bass-cut junctions collapsed into a hard cut.** The branch trimmed both
+  sides to exactly the fade length and crossfaded the stubs; decoded audio is a
+  fraction of a second shorter than nominal, so `acrossfade` could not fit and
+  silently emitted a near-empty segment — the junction became a cut that also
+  dropped the outgoing's last `duration` seconds (measured: 11.00 s short on one
+  pair). The sweep is now applied to the outgoing's last `duration` seconds and
+  the full streams are crossfaded directly.
+- **`mode` was not authoritative over `bass_cut`.** The bass-cut branch was
+  tested before the mode switch, so a `fade_under` junction carrying a bass cut
+  rendered as a crossfade — two different plans produced byte-identical output.
+- **`estimate_tempo` raised `ZeroDivisionError`** on windows too short for the
+  longest autocorrelation lag. Lags are now clamped to what the data supports.
+- **`plan_duration` over-reported** for plans with a bass cut, because of the
+  first bug above; it now agrees with the rendered length.
+
 ### Changed
 - **Fade detection** now uses a longer (20 s) window and a start-vs-end level
   drop rather than an almost-monotonic curve, so long fades are caught. A

@@ -4,6 +4,12 @@
 real sequence): ~8 s of the outgoing track, the 11 s blend, ~8 s of the
 incoming track.
 
+> **Note:** this file was re-rendered with the current renderer. Older copies
+> predate the crossfade fix in
+> [docs/CASE-STUDY.md](../../docs/CASE-STUDY.md#what-the-set-exposed), where
+> bass-cut junctions silently collapsed into a hard cut — an old copy is not a
+> crossfade at all.
+
 It is the output of every feature working together on one junction:
 
 | setting | value |

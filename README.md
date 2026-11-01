@@ -32,11 +32,18 @@ It is deliberately **rules-first**: a small, explainable decision table you can
 edit after listening — not a black box. The machinery to feed an LLM (or a
 human) as the planner is already there; it just isn't needed yet.
 
-## Demo
+## Showcase
 
-[`examples/5-to-6-transition/`](examples/5-to-6-transition/) holds a 27 s
-excerpt of one real transition — beat-matched, tempo-warped ×1.0098, the
-outgoing track's cymbal splash trimmed away, and its bass swept out with a
+**[ARPNOTIC VOL.1](https://www.mixcloud.com/gaiterjones/arpnotic-vol1/)** — nine
+tracks around 123 BPM, mixed end to end by automix (28:53). This is the set the
+heuristics were tuned against and the one that shook the bugs out; the junction
+plan, the four junctions that were hand-set after listening, and what went wrong
+are recorded in
+[docs/CASE-STUDY.md](docs/CASE-STUDY.md#arpnotic-vol1--nine-tracks).
+
+For a close-up, [`examples/5-to-6-transition/`](examples/5-to-6-transition/)
+holds a 27 s excerpt of a single junction — beat-matched, tempo-warped ×1.0098,
+the outgoing track's cymbal splash trimmed away, and its bass swept out with a
 high-pass — together with the plan that produced it.
 
 ## Requirements
@@ -164,9 +171,11 @@ for the details and what it would take to make it earn its keep.
   log-normal prior). It can lock onto a sub-harmonic on tracks with strong
   2:1 / 3:2 accent patterns; on the reference set it matched 10 of 12 tracks.
   Rhythmic-vs-not, which drives the transitions, is unaffected.
-- **`beat_mix` renders as an equal-power crossfade** — there is no tempo
-  matching and beat alignment is off by default, so it is not yet a true beat
-  mix.
+- **`beat_mix` is a crossfade with optional beat work on top.** Tempo matching
+  (`--tempo-match`), phase alignment (`--beat-align`) and the bass cut
+  (`--bass-cut`) all exist but are **off by default** — a plain crossfade was
+  preferred by ear on the reference material. On its own, `beat_mix` is still an
+  equal-power crossfade.
 - The rule thresholds are v1 heuristics tuned on a small reference set. They are
   named constants precisely so you can adjust them against your own material.
 
