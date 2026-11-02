@@ -31,6 +31,7 @@ envelopes and onsets.
 | `lead_silence`, `trail_silence` | envelope below 2 % of peak | seconds |
 | `fade` | monotonic decrease over the last 8 s | engineered fade-out |
 | `abrupt` | still ≥35 % of peak in the final 200 ms | hard stop |
+| `head.rise_s` | seconds until the opening holds within 2 dB of the level it later reaches; **0** unless the opening is ≥8 dB below it | how long a quiet intro takes to arrive. Diagnostic: a planner rule on it was tried and rejected (it fires on nearly every track) |
 
 ### Tempo
 

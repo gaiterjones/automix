@@ -63,6 +63,29 @@ A related floor: a `beat_run` hand-over is never shorter than
 `MIN_BEAT_OVERLAP` (4 s, two bars at 120 BPM), whatever the table returns. Two
 seconds of two tracks is a butt-join.
 
+### A much quieter incoming needs a longer blend
+
+An equal-power crossfade into a head that sits well below the outgoing dips
+through the middle: measured **8 dB** on a pair whose incoming opened ~15 dB down
+(a quiet arpeggio intro), and by ear that junction wanted ~32 s of blend against
+the 8 s default. So the overlap is lengthened when the gap between the outgoing's
+ending and the incoming's head exceeds `LEVEL_GAP_DB` (6 dB): 24 s up to 12 dB,
+32 s above. It only ever *lengthens*, and on the arpnotic set it fired on exactly
+one junction out of eight — the one that had been hand-set to 34 s.
+
+Two related rules were tried and **rejected**, recorded so they are not
+re-derived:
+
+- *Gate the bass cut on "does the ending have low-end to clear out".* It cannot
+  be measured: an arpeggio in F minor carries its own notes at 43 and 87 Hz, so a
+  bass-stripped arp measures −9.0 dB under 150 Hz while a full mix measures
+  −8.6 dB. Indistinguishable. The cut stays un-gated, and an arp set is judged by
+  ear (`--bass-cut 0`).
+- *Extend the overlap to span a quiet intro's `head.rise_s`.* On the arpnotic set
+  every track builds over ~30 s, so it fired on all eight junctions and rewrote a
+  mix that had been approved by ear. `rise_s` remains in the fingerprint as a
+  diagnostic.
+
 ## The decision table
 
 `automix/taxonomy.py::decide(outro, intro) -> (mode, duration_seconds, curve)`:

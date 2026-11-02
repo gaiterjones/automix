@@ -107,6 +107,12 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
     # intro / overall character - first 30s
     head = _features(ffmpeg.decode_pcm(path, 0, min(window, dur), sr), sr)
 
+    # How long the opening takes to reach its own full level. Uses a longer window
+    # than the head features: a quiet arp intro can run for 30s or more, and that
+    # is how long the overlap needs to be.
+    opening = _envelope(ffmpeg.decode_pcm(path, 0, min(60.0, dur), sr), sr)
+    head["rise_s"] = dsp.opening_rise_seconds(opening, dsp.HOP / sr)
+
     # tempo - a mid-track window. Intros and outros mislead the estimator (a
     # quiet or half-time opening reads as a different tempo), so measure the body.
     b_start = max(0.0, dur * 0.15)
@@ -124,6 +130,14 @@ def analyze_track(path: str, window: float = 30.0, edge: float = 12.0,
 
     # outro - the actual ending (last ~12s), plus a 30s tail for context
     end = _features(ffmpeg.decode_pcm(path, max(0.0, dur - edge), edge, sr), sr)
+
+    # NOTE: "how much of the ending is below 150 Hz" was measured here as a
+    # candidate gate for the bass cut, and abandoned: an arpeggio in F minor has
+    # its own notes at 43/87 Hz, so a bass-stripped arp (-9.0 dB under 150 Hz)
+    # is indistinguishable from a full mix (-8.6 dB). The measurement cannot tell
+    # "kick and sub to swap" from "arp only", so gating on it would be guesswork.
+    # Whether the sweep hollows an arp-to-arp junction is an ear question - run
+    # that set with --bass-cut 0 and compare.
 
     # If the very end is a cymbal splash / noise FX (abrupt jump to broadband
     # noise), judge the outro from the music BEFORE it - the splash should be

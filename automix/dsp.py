@@ -177,6 +177,52 @@ def onset_rate(env: list[float], sr: int, hop: int = HOP,
     return round(count / ((len(env) * hop) / sr), 2)
 
 
+def opening_rise_seconds(env: list[float], hop_sec: float,
+                         tolerance_db: float = 2.0, smooth_s: float = 2.0,
+                         min_drop_db: float = 8.0) -> float:
+    """Seconds until the opening stays at its own full level.
+
+    A track that opens at full level returns ~0. An intro that arrives quietly and
+    builds - a long arpeggio intro - returns when it finally arrives, which is how
+    long an overlap has to be for the hand-over to happen while there is music on
+    both sides. Measured on a real pair: a 34s arp intro wanted a ~32s blend, and
+    the level difference alone did not explain it.
+
+    The reference level is the *median of the window's back half*, not its peak: a
+    single loud transient would otherwise be unreachable and every track would
+    report "never arrives". It must also hold for `smooth_s` before it counts.
+
+    Returns 0 unless the opening is actually *deep* - at least `min_drop_db` below
+    the level it later reaches. Nearly every track builds gently over half a
+    minute; only a genuinely quiet intro (an arpeggio arriving 14dB down, say)
+    needs the overlap to span it. Without that gate this fires on everything.
+    """
+    if not env:
+        return 0.0
+    n = len(env)
+    tail = env[n // 2:]
+    if not tail:
+        return 0.0
+    ordered = sorted(tail)
+    target = ordered[len(ordered) // 2]
+    if target <= 0:
+        return 0.0
+
+    opening_s = min(2.0, n * hop_sec)
+    opening = env[: max(1, int(round(opening_s / hop_sec)))]
+    start = sum(opening) / len(opening)
+    if start <= 0 or 20.0 * math.log10(target / start) < min_drop_db:
+        return 0.0
+
+    threshold = target * (10.0 ** (-tolerance_db / 20.0))
+    run, need = 0, max(1, int(round(smooth_s / hop_sec)))
+    for i, value in enumerate(env):
+        run = run + 1 if value >= threshold else 0
+        if run >= need:
+            return round(max(0, i - need + 1) * hop_sec, 1)
+    return round(n * hop_sec, 1)
+
+
 def fade_out_likely(env: list[float], sr: int, hop: int = HOP,
                     seconds: float = 20.0, drop_ratio: float = 0.35,
                     trend: float = 0.6) -> bool:

@@ -48,6 +48,26 @@ aims to follow [Semantic Versioning](https://semver.org/).
   of the audio. Gated to trailing silence ≥ 1 s **and** ≥ 35 % of the overlap,
   so it only fires where the dead air actually swallows the fade.
 
+- **Level-aware overlap**: a crossfade into a head well below the outgoing dips
+  through the middle (measured 8 dB on a real pair), so the blend is lengthened
+  when the gap exceeds 6 dB — 24 s up to 12 dB, 32 s above. Fires only where the
+  incoming is measurably quieter, which on the reference set was one junction of
+  eight.
+- **`head.rise_s`** in the fingerprint: how long the opening takes to reach its
+  own level. Diagnostic only — see the rejected rule below.
+
+### Explored and rejected
+
+Both were built, measured against real material, and withdrawn. Recorded so they
+are not re-derived:
+
+- **Gating the bass cut on low-band energy.** An F-minor arpeggio carries its own
+  notes at 43/87 Hz, so a bass-stripped arp measures −9.0 dB under 150 Hz and a
+  full mix −8.6 dB: the measurement cannot tell "kick and sub to swap" from "arp
+  only".
+- **Extending the overlap by `rise_s`.** Nearly every track builds over ~30 s, so
+  it fired on all eight junctions of a set that had been approved by ear.
+
 ### Fixed
 - **A short fade no longer outranks a beat run.** A beat that runs at full level
   and then decays over a second or two into the end of the file was classified

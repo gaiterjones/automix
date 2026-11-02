@@ -14,6 +14,14 @@ from . import analysis, beatgrid, taxonomy
 # two bars at 120 BPM. Applies only where the outgoing is a beat run.
 MIN_BEAT_OVERLAP = 4.0
 
+# A crossfade into a much quieter head dips through the middle. Above this gap the
+# overlap is lengthened, graded, and capped.
+# A gap of 9dB is the one real case measured: that pair wanted ~32s of blend
+# (chosen by ear) against the 8s rule default, so the ladder leans long.
+LEVEL_GAP_DB = 6.0
+LEVEL_OVERLAP_MID = 24.0
+LEVEL_OVERLAP_LONG = 32.0
+
 
 def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
                target_lufs: float = -14.0, max_gain_db: float = 12.0,
@@ -72,6 +80,29 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
             if end.get("fade") and span > junc["duration"]:
                 junc["duration"] = round(min(max(span, 2.0), 16.0), 2)
                 junc["reason"] = junc["reason"] + " | fade-aware overlap"
+
+        # A much quieter incoming needs a longer blend. An equal-power crossfade
+        # into a head that sits well below the outgoing dips through the middle -
+        # measured 8dB on a real pair whose incoming opened ~15dB down (a quiet
+        # arpeggio intro). Graded by the gap, capped, and only ever lengthens.
+        head_db = float((fingerprints[i + 1].get("head") or {}).get("rms_db") or 0.0)
+        end_db = float(end.get("rms_db") or 0.0)
+        gap = end_db - head_db
+        if (gap > LEVEL_GAP_DB and junc["mode"] in
+                (taxonomy.MODE_BEAT, taxonomy.MODE_XFADE, taxonomy.MODE_FADE_UNDER)):
+            floor = LEVEL_OVERLAP_LONG if gap > 12.0 else LEVEL_OVERLAP_MID
+            if junc["duration"] < floor:
+                junc["duration"] = round(min(floor, 32.0), 2)
+                junc["reason"] = junc["reason"] + (
+                    f" | level-aware overlap: incoming arrives {gap:.0f}dB down")
+
+        # NOTE: a second candidate rule - "extend the overlap to span a quiet
+        # intro that takes `head.rise_s` to arrive" - was tried and rejected. On
+        # the arpnotic set every track builds over ~30s, so it fired on all eight
+        # junctions and rewrote a mix that had been approved by ear. The level gap
+        # below is the conservative form: it fires only when the incoming is
+        # measurably quieter than the outgoing, which happened at exactly one
+        # junction there. `head.rise_s` stays in the fingerprint as a diagnostic.
 
         # Splash / noise-FX endings: end the outgoing before the splash rather
         # than blending a cymbal crash into the next track - it does not belong
@@ -137,6 +168,12 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
 
         # Bass cut: sweep a high-pass up across the outgoing on a beat mix so its
         # kick clears out and the incoming bass takes over cleanly.
+        #
+        # Whether to gate this on "does the outgoing actually have bass to clear
+        # out" was investigated and dropped: on arp material (F minor, notes at
+        # 43/87 Hz) the measurable low-band ratio cannot separate a full mix from
+        # a bass-stripped arp - see the note in analysis.py. It stays un-gated,
+        # and the arp-intro case is settled by ear (`--bass-cut 0`).
         if bass_cut_hz and junc["mode"] == taxonomy.MODE_BEAT:
             junc["bass_cut"] = int(bass_cut_hz)
             junc["reason"] = junc["reason"] + f" | bass cut to {bass_cut_hz}Hz"

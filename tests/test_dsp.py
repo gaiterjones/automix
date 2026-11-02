@@ -333,6 +333,25 @@ class TestPreviewWindows(unittest.TestCase):
         self.assertAlmostEqual(w[1][1], 135.5, places=2)
 
 
+class TestOpeningRise(unittest.TestCase):
+    """How long an opening takes to arrive - diagnostic, not a planner rule."""
+
+    def test_flat_opening_is_zero(self):
+        self.assertEqual(dsp.opening_rise_seconds([0.1] * 200, 0.01), 0.0)
+
+    def test_deep_quiet_intro_reports_when_it_arrives(self):
+        env = [0.01] * int(2.0 / 0.01) + [0.1] * int(20.0 / 0.01)   # 20 dB down for 2s
+        rise = dsp.opening_rise_seconds(env, 0.01)
+        self.assertGreater(rise, 1.5)
+        self.assertLess(rise, 3.5)
+
+    def test_gentle_build_is_not_a_quiet_intro(self):
+        # a 6dB build is below the gate: nearly every track builds like this, and
+        # treating it as a quiet intro rewrites junctions that mix perfectly well
+        env = [0.05] * 100 + [0.1] * 100
+        self.assertEqual(dsp.opening_rise_seconds(env, 0.01), 0.0)
+
+
 class TestOutroClassification(unittest.TestCase):
     @staticmethod
     def _end(**kw):
@@ -372,12 +391,14 @@ class TestOutroClassification(unittest.TestCase):
 
 class TestPlan(unittest.TestCase):
     @staticmethod
-    def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None, trail=0.0):
-        head = {"bpm": 123.0, "tempo_strength": 5.0}
+    def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None, trail=0.0,
+            head_rms=-12.0, end_rms=-12.0):
+        head = {"bpm": 123.0, "tempo_strength": 5.0, "rms_db": head_rms}
         return {
             "path": "x", "duration": 100.0, "lufs_integrated": -14.0,
             "head": head, "intro_class": intro, "outro_class": outro,
-            "end": {"fade": fade, "fade_span": fade_span, "trail_silence": trail},
+            "end": {"fade": fade, "fade_span": fade_span, "trail_silence": trail,
+                    "rms_db": end_rms},
             "tail": {"fade_span": tail_span if tail_span is not None else fade_span},
         }
 
@@ -410,6 +431,23 @@ class TestPlan(unittest.TestCase):
         j = p["junctions"][0]
         self.assertEqual(j["duration"], planmod.MIN_BEAT_OVERLAP)
         self.assertIn("minimum", j["reason"])
+
+    def test_quiet_incoming_gets_a_longer_overlap(self):
+        # a crossfade into a head 10dB down dips through the middle; measured 8dB
+        # on a real pair whose incoming opened well below the outgoing
+        fps = [self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT, end_rms=-12.0),
+               self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT, head_rms=-22.0)]
+        p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        j = p["junctions"][0]
+        self.assertGreaterEqual(j["duration"], planmod.LEVEL_OVERLAP_MID)
+        self.assertIn("level-aware", j["reason"])
+
+    def test_level_matched_incoming_keeps_the_default(self):
+        fps = [self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT, end_rms=-12.0),
+               self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT, head_rms=-14.0)]
+        p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        j = p["junctions"][0]
+        self.assertNotIn("level-aware", j["reason"])
 
     def test_trailing_silence_is_trimmed_from_the_overlap(self):
         # a fade-out that dies before the file ends leaves dead air; anchoring
