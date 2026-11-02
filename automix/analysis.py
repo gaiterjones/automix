@@ -24,6 +24,7 @@ def _envelope(samples, sr: int) -> list[float]:
 
 # tunable thresholds (v1 heuristics - adjust after listening)
 T_STRENGTH = 2.0     # autocorr peak/mean for "clearly rhythmic"
+FADE_TAIL = 3.0      # a fade shorter than this is usually a beat's tail, not a fade
 T_ONSET = 2.0        # onsets/sec for "active rhythm"
 T_ZCR = 0.16         # zero-crossing rate for "noisy / voice-like"
 T_LEAD = 1.0         # seconds of leading silence -> silent lead-in
@@ -67,6 +68,16 @@ def classify_intro(f: dict) -> str:
 
 
 def classify_outro(f: dict, head: dict) -> str:
+    # A *short* fade is usually just the tail of a beat that stops: a beat runs
+    # at full level, decays over a second or two, and the file ends. Letting the
+    # fade win turns that into "fade_out", and the overlap is then sized from
+    # the short fade - which lands inside the decay and sounds like no mix at
+    # all. Where the ending is strongly rhythmic, trust the rhythm.
+    short_fade = (f["fade"]
+                  and float(f.get("fade_span") or 0.0) < FADE_TAIL
+                  and f["tempo_strength"] >= T_STRENGTH)
+    if short_fade:
+        return taxonomy.OUTRO_BEATRUN
     if f["fade"]:                                    # an engineered fade wins
         return taxonomy.OUTRO_FADE
     if f["tempo_strength"] >= T_STRENGTH:            # rhythm runs to the end

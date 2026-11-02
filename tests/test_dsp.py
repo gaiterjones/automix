@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from array import array
 
-from automix import dsp, plan as planmod, render, taxonomy
+from automix import analysis, dsp, plan as planmod, render, taxonomy
 
 SR = 11025
 HOP = dsp.HOP
@@ -333,6 +333,43 @@ class TestPreviewWindows(unittest.TestCase):
         self.assertAlmostEqual(w[1][1], 135.5, places=2)
 
 
+class TestOutroClassification(unittest.TestCase):
+    @staticmethod
+    def _end(**kw):
+        base = {"fade": False, "fade_span": 0.0, "tempo_strength": 1.0,
+                "abrupt": False, "trail_silence": 0.0, "rms_db": -12.0, "zcr": 0.10}
+        base.update(kw)
+        return base
+
+    HEAD = {"rms_db": -12.0}
+
+    def test_short_fade_on_a_beat_run_is_not_a_fade(self):
+        # measured on real material: a beat at full level decays over ~2s and the
+        # file ends. Calling that a fade sized the overlap to 2s - inside the
+        # decay - which sounded like no mix at all.
+        end = self._end(fade=True, fade_span=2.14, tempo_strength=4.46,
+                        trail_silence=1.74)
+        self.assertEqual(analysis.classify_outro(end, self.HEAD),
+                         taxonomy.OUTRO_BEATRUN)
+
+    def test_long_fade_still_wins(self):
+        # an engineered 7.7s fade on rhythmic material is a genuine fade
+        end = self._end(fade=True, fade_span=7.73, tempo_strength=3.03)
+        self.assertEqual(analysis.classify_outro(end, self.HEAD),
+                         taxonomy.OUTRO_FADE)
+
+    def test_short_fade_without_rhythm_stays_a_fade(self):
+        end = self._end(fade=True, fade_span=1.50, tempo_strength=0.90)
+        self.assertEqual(analysis.classify_outro(end, self.HEAD),
+                         taxonomy.OUTRO_FADE)
+
+    def test_fade_tail_boundary(self):
+        # at the threshold the fade wins again - the rule is strictly "shorter"
+        end = self._end(fade=True, fade_span=analysis.FADE_TAIL, tempo_strength=4.0)
+        self.assertEqual(analysis.classify_outro(end, self.HEAD),
+                         taxonomy.OUTRO_FADE)
+
+
 class TestPlan(unittest.TestCase):
     @staticmethod
     def _fp(outro, intro, fade=False, fade_span=0.0, tail_span=None, trail=0.0):
@@ -360,6 +397,19 @@ class TestPlan(unittest.TestCase):
         self.assertEqual(j["mode"], taxonomy.MODE_FADE_UNDER)
         self.assertGreaterEqual(j["duration"], 8.0)
         self.assertIn("fade-aware", j["reason"])
+
+    def test_beat_run_gets_a_minimum_overlap(self):
+        # a beat run must never be handed over in less than a couple of bars,
+        # whatever the table says: 2s of two tracks is a butt-join
+        from unittest import mock
+        fps = [self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT),
+               self._fp(taxonomy.OUTRO_BEATRUN, taxonomy.INTRO_BEAT)]
+        with mock.patch.object(taxonomy, "decide",
+                               return_value=(taxonomy.MODE_BEAT, 2.0, "tri")):
+            p = planmod.build_plan(["a", "b"], fps, beat_align=False)
+        j = p["junctions"][0]
+        self.assertEqual(j["duration"], planmod.MIN_BEAT_OVERLAP)
+        self.assertIn("minimum", j["reason"])
 
     def test_trailing_silence_is_trimmed_from_the_overlap(self):
         # a fade-out that dies before the file ends leaves dead air; anchoring

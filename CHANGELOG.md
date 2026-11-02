@@ -49,6 +49,17 @@ aims to follow [Semantic Versioning](https://semver.org/).
   so it only fires where the dead air actually swallows the fade.
 
 ### Fixed
+- **A short fade no longer outranks a beat run.** A beat that runs at full level
+  and then decays over a second or two into the end of the file was classified
+  `fade_out`; the fade-aware overlap then sized the blend from that short fade,
+  so the junction landed inside the decay and was heard as *no mix at all*.
+  Measured on a live set: a track at −8 dBFS with `end.tempo_strength` 4.46 and
+  a 2.14 s fade got a **2.16 s** overlap into a track that opens on a solid beat.
+  Endings now classify as `beat_run` when the fade is shorter than `FADE_TAIL`
+  (3 s) *and* the ending is rhythmic; genuine 5–8 s fades are unaffected.
+- **A `beat_run` hand-over gets a minimum 4 s overlap** (`MIN_BEAT_OVERLAP`, two
+  bars at 120 BPM), whatever the table returns. Two seconds of two tracks is a
+  butt-join, not a blend.
 - **Bass-cut junctions collapsed into a hard cut.** The branch trimmed both
   sides to exactly the fade length and crossfaded the stubs; decoded audio is a
   fraction of a second shorter than nominal, so `acrossfade` could not fit and

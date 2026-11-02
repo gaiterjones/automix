@@ -43,6 +43,26 @@ Every track gets an **intro class** and an **outro class** (see
 `curve` is any ffmpeg `acrossfade` curve: `tri`, `qsin`, `hsin`, `esin`, `log`,
 `ipar`, `qua`, `cub`, `squ`, `cbr`, `par`, `exp`, `lin`, `sin`.
 
+### A short fade is usually a beat's tail
+
+Most dance tracks that "end on a fade" actually end with the beat at full level
+that decays over a second or two into the file's end. Classifying that as
+`fade_out` is doubly damaging, because the overlap is then sized from the fade:
+
+1. the outro becomes `fade_out`, so the table picks `fade_under`;
+2. the fade-aware overlap sizes the blend from `fade_span` — two seconds;
+3. a two-second blend centred on the decay is, audibly, **no mix at all**.
+
+Measured on a real track: beat at −8 dBFS with `end.tempo_strength` 4.46 right
+up to the end, then a 2.14 s decay and 1.7 s of silence — which produced a 2.16 s
+junction. So the ending is classified `beat_run` when the fade is shorter than
+`FADE_TAIL` (3 s, in `analysis.py`) **and** the ending is rhythmic. Genuine
+engineered fades — 5 to 8 seconds — are unaffected, as is anything not rhythmic.
+
+A related floor: a `beat_run` hand-over is never shorter than
+`MIN_BEAT_OVERLAP` (4 s, two bars at 120 BPM), whatever the table returns. Two
+seconds of two tracks is a butt-join.
+
 ## The decision table
 
 `automix/taxonomy.py::decide(outro, intro) -> (mode, duration_seconds, curve)`:

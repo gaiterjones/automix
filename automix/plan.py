@@ -10,6 +10,10 @@ import json
 
 from . import analysis, beatgrid, taxonomy
 
+# The shortest overlap that can be heard as a blend rather than a butt-join:
+# two bars at 120 BPM. Applies only where the outgoing is a beat run.
+MIN_BEAT_OVERLAP = 4.0
+
 
 def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
                target_lufs: float = -14.0, max_gain_db: float = 12.0,
@@ -52,6 +56,14 @@ def build_plan(paths: list[str], fingerprints: list[dict] | None = None,
         fp = fingerprints[i]
         end = fp.get("end") or {}
         tail = fp.get("tail") or {}
+
+        # A rhythmic hand-over needs room to be heard as a mix. Two seconds of
+        # two tracks is not a blend, it is a butt-join. Scoped to beat_run so it
+        # cannot disturb the deliberate short crossfades used for real fades.
+        if (outro == taxonomy.OUTRO_BEATRUN and junc["mode"] != taxonomy.MODE_CUT
+                and junc["duration"] < MIN_BEAT_OVERLAP):
+            junc["duration"] = MIN_BEAT_OVERLAP
+            junc["reason"] = junc["reason"] + f" | raised to a {MIN_BEAT_OVERLAP:g}s minimum"
 
         # A fading ending needs the overlap to span the fade, or the crossfade
         # starts after the outgoing has already gone quiet (a hole in the level).
